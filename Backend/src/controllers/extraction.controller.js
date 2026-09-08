@@ -5,11 +5,16 @@ class ExtractionController {
     async extractBiodata(req, res) {
         const apiResponse = new ApiResponse(res)
         try {
-            if (!req.file) {
+            if (!req.file && !req.body?.text) {
                 return apiResponse.error("No file uploaded.", 400)
             }
 
-            const data = await extractionService.extractBiodata(req.file.buffer, req.file.mimetype)
+            let data
+            if (req.file) {
+                data = await extractionService.extractBiodata(req.file.buffer, req.file.mimetype)
+            } else {
+                data = await extractionService.extractBiodata(Buffer.from(req.body.text, "utf-8"), "text/plain")
+            }
             return apiResponse.success(data, "Biodata extracted successfully")
         } catch (error) {
             console.error("Extraction error:", error)

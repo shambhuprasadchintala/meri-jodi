@@ -63,6 +63,8 @@ export default function PersonalDetails({
     setFormData((prev) => ({
       ...prev,
       [field]: value,
+      ...(field === "location" ? { city: value } : {}),
+      ...(field === "city" ? { location: value } : {}),
     }));
 
     if (errors[field]) {

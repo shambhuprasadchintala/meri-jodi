@@ -206,14 +206,20 @@ export const buildPersonalDetailsPayload = (formData) => {
 export const buildFamilyPayload = (formData) => {
   const payload = {}
   const family = {}
-  if (formData.motherTongue !== undefined) payload.motherTongue = formData.motherTongue
-  if (formData.familyType !== undefined) family.familyType = formData.familyType
-  if (formData.fatherOccupation !== undefined) family.fatherOccupation = formData.fatherOccupation
-  if (formData.motherOccupation !== undefined) family.motherOccupation = formData.motherOccupation
-  if (formData.familyValues !== undefined) family.familyValues = formData.familyValues
-  if (formData.familyAffluence !== undefined) family.familyAffluence = formData.familyAffluence
-  if (formData.numBrothers !== undefined) family.numBrothers = Number(formData.numBrothers) || 0
-  if (formData.numSisters !== undefined) family.numSisters = Number(formData.numSisters) || 0
+  if (formData.motherTongue?.trim()) payload.motherTongue = formData.motherTongue.trim()
+  if (formData.familyType?.trim()) family.familyType = formData.familyType.trim()
+  if (formData.fatherOccupation?.trim()) family.fatherOccupation = formData.fatherOccupation.trim()
+  if (formData.motherOccupation?.trim()) family.motherOccupation = formData.motherOccupation.trim()
+  if (formData.familyValues?.trim()) family.familyValues = formData.familyValues.trim()
+  if (formData.familyAffluence?.trim()) family.familyAffluence = formData.familyAffluence.trim()
+  if (formData.numBrothers !== undefined && formData.numBrothers !== "") {
+    const b = Number(formData.numBrothers)
+    if (!isNaN(b)) family.numBrothers = b
+  }
+  if (formData.numSisters !== undefined && formData.numSisters !== "") {
+    const s = Number(formData.numSisters)
+    if (!isNaN(s)) family.numSisters = s
+  }
   if (Object.keys(family).length) payload.family = family
   return payload
 }
@@ -222,15 +228,18 @@ export const buildCareerEducationPayload = (formData) => {
   const payload = {}
   const education = {}
   const career = {}
-  if (formData.education !== undefined) education.highestDegree = formData.education
-  if (formData.fieldOfStudy !== undefined) education.fieldOfStudy = formData.fieldOfStudy
-  if (formData.institution !== undefined) education.institution = formData.institution
-  if (formData.graduationYear !== undefined) education.graduationYear = Number(formData.graduationYear) || undefined
-  if (formData.occupation !== undefined) career.occupation = formData.occupation
-  if (formData.companyName !== undefined) career.companyName = formData.companyName
-  if (formData.industry !== undefined) career.industry = formData.industry
-  if (formData.annualIncome !== undefined) career.annualIncome = formData.annualIncome
-  if (formData.workLocation !== undefined) career.workLocation = formData.workLocation
+  if (formData.education?.trim()) education.highestDegree = formData.education.trim()
+  if (formData.fieldOfStudy?.trim()) education.fieldOfStudy = formData.fieldOfStudy.trim()
+  if (formData.institution?.trim()) education.institution = formData.institution.trim()
+  if (formData.graduationYear !== undefined && formData.graduationYear !== "") {
+    const yr = Number(formData.graduationYear)
+    if (!isNaN(yr)) education.graduationYear = yr
+  }
+  if (formData.occupation?.trim()) career.occupation = formData.occupation.trim()
+  if (formData.companyName?.trim()) career.companyName = formData.companyName.trim()
+  if (formData.industry?.trim()) career.industry = formData.industry.trim()
+  if (formData.annualIncome?.trim()) career.annualIncome = formData.annualIncome.trim()
+  if (formData.workLocation?.trim()) career.workLocation = formData.workLocation.trim()
   if (Object.keys(education).length) payload.education = education
   if (Object.keys(career).length) payload.career = career
   return payload
@@ -238,24 +247,24 @@ export const buildCareerEducationPayload = (formData) => {
 
 export const buildReligionPayload = (formData) => {
   const payload = {}
-  if (formData.motherTongue !== undefined) payload.motherTongue = formData.motherTongue
-  if (formData.religion !== undefined) payload.religion = formData.religion
-  if (formData.caste !== undefined) payload.caste = formData.caste
-  if (formData.gotham !== undefined) payload.gotham = formData.gotham
-  if (formData.rashi !== undefined) payload.rashi = formData.rashi
-  if (formData.nakshtra !== undefined) payload.nakshtra = formData.nakshtra
-  if (formData.manglik !== undefined) payload.manglik = formData.manglik
+  if (formData.motherTongue?.trim()) payload.motherTongue = formData.motherTongue.trim()
+  if (formData.religion?.trim()) payload.religion = formData.religion.trim()
+  if (formData.caste?.trim()) payload.caste = formData.caste.trim()
+  if (formData.gotham?.trim()) payload.gotham = formData.gotham.trim()
+  if (formData.rashi?.trim()) payload.rashi = formData.rashi.trim()
+  if (formData.nakshtra?.trim()) payload.nakshtra = formData.nakshtra.trim()
+  if (formData.manglik?.trim()) payload.manglik = formData.manglik.trim()
   return payload
 }
 
 export const buildLifestylePayload = (formData) => {
   const payload = {}
   const lifestyle = {}
-  if (formData.diet !== undefined) lifestyle.diet = formData.diet
-  if (formData.smoking !== undefined) lifestyle.smoking = formData.smoking === "true" || formData.smoking === true
-  if (formData.drinking !== undefined) lifestyle.drinking = formData.drinking === "true" || formData.drinking === true
+  if (formData.diet?.trim()) lifestyle.diet = formData.diet.trim()
+  if (formData.smoking !== undefined && formData.smoking !== "") lifestyle.smoking = formData.smoking === "true" || formData.smoking === true
+  if (formData.drinking !== undefined && formData.drinking !== "") lifestyle.drinking = formData.drinking === "true" || formData.drinking === true
   if (Object.keys(lifestyle).length) payload.lifestyle = lifestyle
-  if (formData.aboutMe !== undefined) payload.aboutMe = formData.aboutMe
+  if (formData.aboutMe?.trim()) payload.aboutMe = formData.aboutMe.trim()
   if (Array.isArray(formData.hobbiesAndInterests)) payload.hobbiesAndInterests = formData.hobbiesAndInterests
   return payload
 }

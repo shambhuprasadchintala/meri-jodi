@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import { ArrowLeft, Check } from "lucide-react"
 import { useAuth } from "../context/AuthContext"
-import { createProfile, buildProfilePayload } from "../api/profileApi"
+import { getMyProfile, createProfile, buildProfilePayload } from "../api/profileApi"
 import { updatePartnerPreferences } from "../api/partnerPreferenceApi"
 import weddingImage from "../assets/login-image.png"
 import Logo from "../assets/logo_1.svg"
@@ -211,6 +211,7 @@ const AddDetailsManually = () => {
         extractedData.gender ||
         extractedData.personal_details?.gender ||
         savedData.gender ||
+        user?.gender ||
         ""
       ).toLowerCase(),
       year:
@@ -243,6 +244,7 @@ const AddDetailsManually = () => {
         extractedData.contact_details?.city ||
         extractedData.city ||
         savedData.location ||
+        user?.location ||
         "",
       education:
         extractedData.education ||
@@ -269,6 +271,8 @@ const AddDetailsManually = () => {
         extractedData.location ||
         extractedData.contact_details?.city ||
         savedData.city ||
+        savedData.location ||
+        user?.location ||
         "",
       religion:
         extractedData.religion ||
@@ -368,18 +372,18 @@ const AddDetailsManually = () => {
         timeOfBirth: ext.timeOfBirth || ext.birthTiming || ext.personal_details?.time_of_birth || prev.timeOfBirth || "",
         birthTiming: ext.birthTiming || ext.timeOfBirth || ext.personal_details?.time_of_birth || prev.birthTiming || "",
         motherTongue: ext.motherTongue || ext.personal_details?.mother_tongue || prev.motherTongue || "",
-        gender: (ext.gender || ext.personal_details?.gender || prev.gender || "").toLowerCase(),
+        gender: (ext.gender || ext.personal_details?.gender || prev.gender || user?.gender || "").toLowerCase(),
         year: ext.year || dobParts.year || prev.year || "",
         month: ext.month || dobParts.month || prev.month || "",
         day: ext.day || dobParts.day || prev.day || "",
         about: ext.about || ext.personal_details?.about_me || prev.about || "",
         height: ext.height || ext.personal_details?.height || prev.height || "",
-        location: ext.location || ext.contact_details?.city || ext.city || prev.location || "",
+        location: ext.location || ext.contact_details?.city || ext.city || prev.location || user?.location || "",
         education: ext.education || ext.personal_details?.highest_education || prev.education || "",
         occupation: ext.occupation || ext.personal_details?.occupation || prev.occupation || "",
         company: ext.company || ext.personal_details?.organization_name || prev.company || "",
         income: ext.income || ext.personal_details?.annual_income || prev.income || "",
-        city: ext.city || ext.location || ext.contact_details?.city || prev.city || "",
+        city: ext.city || ext.location || ext.contact_details?.city || prev.city || user?.location || "",
         religion: ext.religion || ext.personal_details?.religion || prev.religion || "",
         caste: ext.caste || ext.personal_details?.caste || prev.caste || "No Preference",
         hobbies: Array.isArray(ext.hobbies) && ext.hobbies.length > 0 ? ext.hobbies : (Array.isArray(ext.personal_details?.hobbies) ? ext.personal_details.hobbies : prev.hobbies),
@@ -387,7 +391,65 @@ const AddDetailsManually = () => {
       }))
       setStep(1)
     }
-  }, [location.state])
+  }, [location.state, user])
+
+  // If user navigated directly (not from upload), prefill from database profile
+  useEffect(() => {
+    if (fromUpload) return
+    let isMounted = true
+    getMyProfile()
+      .then((existing) => {
+        if (!isMounted || !existing) return
+        setFormData((prev) => {
+          const dobParts = parseSafeDob(existing.dateOfBirth)
+          return {
+            ...prev,
+            name:
+              prev.name ||
+              existing.name ||
+              (user?.name && !["Google Member", "MeriJodi Member", "New Member"].includes(user.name) ? user.name : "") ||
+              "",
+            gender:
+              prev.gender ||
+              (existing.gender ? String(existing.gender).toLowerCase() : "") ||
+              (user?.gender ? String(user.gender).toLowerCase() : "") ||
+              "",
+            location: prev.location || existing.location?.city || user?.location || "",
+            city: prev.city || existing.location?.city || user?.location || "",
+            birthPlace: prev.birthPlace || existing.placeOfBirth || "",
+            timeOfBirth: prev.timeOfBirth || existing.timeOfBirth || "",
+            birthTiming: prev.birthTiming || existing.timeOfBirth || "",
+            day: prev.day || dobParts.day || "",
+            month: prev.month || dobParts.month || "",
+            year: prev.year || dobParts.year || "",
+            motherTongue: prev.motherTongue || existing.motherTongue || "",
+            about: prev.about || existing.aboutMe || "",
+            height: prev.height || (existing.heightCm ? String(existing.heightCm) : ""),
+            education: prev.education || existing.education?.highestDegree || "",
+            occupation: prev.occupation || existing.career?.occupation || "",
+            company: prev.company || existing.career?.companyName || "",
+            income: prev.income || existing.career?.annualIncome || "",
+            religion: prev.religion || existing.religion || "",
+            caste: prev.caste || existing.caste || "No Preference",
+            gotham: prev.gotham || existing.gotham || "",
+            rashi: prev.rashi || existing.rashi || "",
+            nakshtra: prev.nakshtra || existing.nakshtra || "",
+            hobbies:
+              Array.isArray(prev.hobbies) && prev.hobbies.length > 0
+                ? prev.hobbies
+                : Array.isArray(existing.hobbiesAndInterests)
+                ? existing.hobbiesAndInterests
+                : [],
+          }
+        })
+      })
+      .catch((err) => {
+        console.warn("Could not prefill profile in AddDetailsManually", err)
+      })
+    return () => {
+      isMounted = false
+    }
+  }, [fromUpload, user])
 
   // Auto-save form data to localStorage whenever user types
   useEffect(() => {

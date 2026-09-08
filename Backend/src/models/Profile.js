@@ -78,7 +78,6 @@ const profileSchema = new Schema(
         gender: {
             type: String,
             enum: Object.values(GENDER),
-            default: GENDER.MALE,
         },
         aboutMe: { type: String, trim: true },
         heightCm: Number,

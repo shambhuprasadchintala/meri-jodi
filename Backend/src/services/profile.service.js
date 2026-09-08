@@ -127,11 +127,11 @@ class ProfileService {
         if (normalized.fatherOccupation || normalized.motherOccupation || normalized.familyType || normalized.familyValues || normalized.familyAffluence) {
             normalized.family = {
                 ...(typeof normalized.family === "object" ? normalized.family : {}),
-                ...(normalized.fatherOccupation ? { fatherOccupation: normalized.fatherOccupation } : {}),
-                ...(normalized.motherOccupation ? { motherOccupation: normalized.motherOccupation } : {}),
-                ...(normalized.familyType ? { familyType: normalized.familyType } : {}),
-                ...(normalized.familyValues ? { familyValues: normalized.familyValues } : {}),
-                ...(normalized.familyAffluence ? { familyAffluence: normalized.familyAffluence } : {}),
+                ...(normalized.fatherOccupation?.trim() ? { fatherOccupation: normalized.fatherOccupation.trim() } : {}),
+                ...(normalized.motherOccupation?.trim() ? { motherOccupation: normalized.motherOccupation.trim() } : {}),
+                ...(normalized.familyType?.trim() ? { familyType: normalized.familyType.trim() } : {}),
+                ...(normalized.familyValues?.trim() ? { familyValues: normalized.familyValues.trim() } : {}),
+                ...(normalized.familyAffluence?.trim() ? { familyAffluence: normalized.familyAffluence.trim() } : {}),
             }
         }
 
@@ -227,12 +227,15 @@ class ProfileService {
         // Build atomic $set object with dot-notation for nested fields to prevent field obliteration
         const updateSet = {}
         for (const [key, val] of Object.entries(sanitized)) {
-            if (val === undefined) continue
+            if (val === undefined || val === null) continue
 
             if (["location", "education", "career", "family", "lifestyle"].includes(key) && val && typeof val === "object" && !Array.isArray(val)) {
                 for (let [subKey, subVal] of Object.entries(val)) {
-                    if (subVal === undefined) continue
-                    if (typeof subVal === "string") subVal = subVal.trim()
+                    if (subVal === undefined || subVal === null) continue
+                    if (typeof subVal === "string") {
+                        subVal = subVal.trim()
+                        if (subVal === "") continue
+                    }
 
                     // Normalize nested enum & numeric fields
                     if (key === "family") {
@@ -271,7 +274,7 @@ class ProfileService {
                 let topVal = val
                 if (typeof topVal === "string") {
                     topVal = topVal.trim()
-                    if (topVal === "" && ["maritalStatus", "gender", "createdBy"].includes(key)) {
+                    if (topVal === "" && ["maritalStatus", "gender", "createdBy", "religion", "caste", "gotham", "rashi", "nakshtra"].includes(key)) {
                         continue
                     }
                     if (key === "maritalStatus") {
@@ -279,20 +282,28 @@ class ProfileService {
                             topVal = "never_married"
                         }
                     }
+                    if (key === "gender") {
+                        topVal = topVal.toLowerCase()
+                    }
                 }
-                updateSet[key] = topVal
+                if (topVal !== undefined && topVal !== "") {
+                    updateSet[key] = topVal
+                }
             }
         }
 
         const profile = await Profile.findOneAndUpdate(
             { userId },
             { $set: updateSet },
-            { returnDocument: "after", runValidators: true }
+            { returnDocument: "after", runValidators: false }
         ).populate("userId", "name email phone avatar")
 
         if (profile) {
-            profile.profileCompletionPct = this._calculateCompletion(profile)
-            await profile.save()
+            const completion = this._calculateCompletion(profile)
+            if (profile.profileCompletionPct !== completion) {
+                profile.profileCompletionPct = completion
+                await Profile.updateOne({ _id: profile._id }, { $set: { profileCompletionPct: completion } })
+            }
         }
         return profile
     }

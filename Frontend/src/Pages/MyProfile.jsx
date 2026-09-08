@@ -158,8 +158,14 @@ export default function MyProfile() {
         setStatus("loading")
         try {
             const [profileData, prefData, matchData] = await Promise.all([
-                getMyProfile(),
-                getPartnerPreferences(),
+                getMyProfile().catch((err) => {
+                    console.warn("getMyProfile error:", err?.message)
+                    return null
+                }),
+                getPartnerPreferences().catch((err) => {
+                    console.warn("getPartnerPreferences error:", err?.message)
+                    return null
+                }),
                 getMyMatches({ limit: 6 }).catch(() => ({ matches: [] })),
             ])
 
@@ -257,6 +263,32 @@ export default function MyProfile() {
                         className="px-8 py-3 rounded-full bg-[#842029] text-white font-semibold text-sm hover:bg-[#6b1b27] transition-all shadow-sm"
                     >
                         Fill Biodata Manually
+                    </button>
+                </div>
+                <Footer />
+            </div>
+        )
+    }
+
+    if (status === "error") {
+        return (
+            <div className="min-h-screen bg-[#FBF9F9] flex flex-col">
+                <Navbar />
+                <div className="flex-1 max-w-md mx-auto px-6 py-20 text-center flex flex-col items-center justify-center">
+                    <div className="w-16 h-16 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-4 text-2xl">
+                        ⚠️
+                    </div>
+                    <h2 className="text-xl font-bold font-serif text-gray-900 mb-2">
+                        Could Not Load Profile
+                    </h2>
+                    <p className="text-gray-500 text-sm mb-6">
+                        There was a temporary problem retrieving your profile. Please check your connection and try again.
+                    </p>
+                    <button
+                        onClick={fetchProfileAndData}
+                        className="px-6 py-2.5 rounded-full bg-[#842029] text-white font-semibold text-sm hover:bg-[#6b1b27] transition-all shadow-sm cursor-pointer"
+                    >
+                        Try Again
                     </button>
                 </div>
                 <Footer />
@@ -458,6 +490,7 @@ export default function MyProfile() {
                         <div className="space-y-1">
                             <DetailRow label="Age" value={calculateAge(profile.dateOfBirth) ? `${calculateAge(profile.dateOfBirth)} Years` : null} onAdd={() => setEditingSection("personal")} />
                             <DetailRow label="Height" value={formatHeight(profile.heightCm)} onAdd={() => setEditingSection("personal")} />
+                            <DetailRow label="Current City / Location" value={profile.location?.city || formatLocation(profile.location)} onAdd={() => setEditingSection("personal")} />
                             <DetailRow label="Date of Birth" value={formatDate(profile.dateOfBirth)} onAdd={() => setEditingSection("personal")} />
                             <DetailRow label="Place of Birth" value={profile.placeOfBirth} onAdd={() => setEditingSection("personal")} />
                             <DetailRow label="Time of Birth" value={profile.timeOfBirth || profile.birthTime || profile.birthTiming} onAdd={() => setEditingSection("personal")} />

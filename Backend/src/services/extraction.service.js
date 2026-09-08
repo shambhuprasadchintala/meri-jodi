@@ -315,8 +315,8 @@ const extractBiodataFromTextHeuristic = (text = "") => {
         /(?:Gender|Sex)\s*[:\-]\s*(Male|Female|Other)/i,
     ])
     if (!gender) {
-        if (/bride|female|daughter|girl|woman|she\/her/i.test(clean)) gender = "female"
-        else if (/groom|male|son|boy|man|he\/him/i.test(clean)) gender = "male"
+        if (/\b(?:bride|female|daughter|girl|woman|she\/her|kumari|ms|miss|mrs|d\/o)\b/i.test(clean)) gender = "female"
+        else if (/\b(?:groom|male|son|boy|man|he\/him|shri|mr|s\/o)\b/i.test(clean)) gender = "male"
     }
 
     const rawHeight = findMatch([
@@ -427,7 +427,7 @@ const extractBiodataFromTextHeuristic = (text = "") => {
     return normalizeBiodataResult({
         personal_details: {
             name: name || "Candidate",
-            gender: gender || "male",
+            gender: gender ? String(gender).toLowerCase() : "",
             date_of_birth: dateOfBirth || "",
             place_of_birth: placeOfBirth || "",
             time_of_birth: timeOfBirth || "",
@@ -486,7 +486,18 @@ const normalizeBiodataResult = (data = {}) => {
     const rawIncome = personal.annual_income || personal.income || data.income || ""
     const normalizedIncome = normalizeIncomeRange(rawIncome)
 
-    const gender = (personal.gender || data.gender || "male").toLowerCase()
+    const rawGender = personal.gender || data.gender || ""
+    let gender = rawGender ? String(rawGender).toLowerCase().trim() : ""
+    if (gender !== "male" && gender !== "female" && gender !== "other") {
+        const fullDump = JSON.stringify(data)
+        if (/\b(?:bride|female|daughter|girl|woman|she|kumari|mrs|ms|miss)\b/i.test(fullDump)) {
+            gender = "female"
+        } else if (/\b(?:groom|male|son|boy|man|he|shri|mr)\b/i.test(fullDump)) {
+            gender = "male"
+        } else {
+            gender = "female"
+        }
+    }
     const ageFromYear = year ? new Date().getFullYear() - parseInt(year, 10) : 26
     const minAge = gender === "male" ? Math.max(18, ageFromYear - 5) : Math.max(18, ageFromYear)
     const maxAge = gender === "male" ? ageFromYear : ageFromYear + 5
@@ -569,7 +580,7 @@ const createDefaultBiodataStructure = () => {
     return normalizeBiodataResult({
         personal_details: {
             name: "",
-            gender: "male",
+            gender: "female",
             date_of_birth: "",
             place_of_birth: "",
             time_of_birth: "",

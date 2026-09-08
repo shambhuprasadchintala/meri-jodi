@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom"
 import { useAuth } from "../context/AuthContext"
 import { loginWithEmail, verifyLoginOtp, resendLoginOtp, googleAuth } from "../api/authApi"
 import logo from "../assets/logo2.png"
+import { Eye, EyeOff } from "lucide-react"
 
 import { useGoogleLogin } from "@react-oauth/google"
 
@@ -17,6 +18,7 @@ const LoginPage = () => {
     const [step, setStep] = useState("credentials") // 'credentials' | 'otp'
     const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")
+    const [showPassword, setShowPassword] = useState(false)
     const [otp, setOtp] = useState(["", "", "", "", "", ""])
     const [devOtp, setDevOtp] = useState("")
     const [error, setError] = useState("")
@@ -236,14 +238,24 @@ const LoginPage = () => {
                                     <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wider">
                                         Password
                                     </label>
-                                    <input
-                                        type="password"
-                                        placeholder="Enter your password"
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:border-[#ED5463] focus:ring-2 focus:ring-[#ED5463]/20 focus:outline-none transition-all"
-                                        required
-                                    />
+                                    <div className="relative">
+                                        <input
+                                            type={showPassword ? "text" : "password"}
+                                            placeholder="Enter your password"
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            className="w-full rounded-xl border border-gray-300 px-4 py-3 pr-11 text-sm focus:border-[#ED5463] focus:ring-2 focus:ring-[#ED5463]/20 focus:outline-none transition-all"
+                                            required
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPassword((prev) => !prev)}
+                                            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none cursor-pointer"
+                                            aria-label={showPassword ? "Hide password" : "Show password"}
+                                        >
+                                            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                        </button>
+                                    </div>
                                     <div className="flex justify-end mt-1">
                                         <Link to="/forgot-password" className="text-xs text-[#ED5463] font-semibold hover:underline">
                                             Forgot Password?

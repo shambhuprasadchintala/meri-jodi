@@ -41,7 +41,7 @@ router.post("/register", sanitizeBody, async (req, res) => {
             return apiResponse.error(errorDetails.message, 400)
         }
 
-        const { name, email, password, phone, gender } = validation.data
+        const { name, email, password, phone, gender, location } = validation.data
         const reqIp = req.ip || req.connection?.remoteAddress || "127.0.0.1"
 
         const result = await authService.registerUser({
@@ -50,6 +50,7 @@ router.post("/register", sanitizeBody, async (req, res) => {
             password,
             phone,
             gender,
+            location,
             reqIp,
         })
 

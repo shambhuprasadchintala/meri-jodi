@@ -8,28 +8,36 @@ const familyValuesValues = Object.values(FAMILY_VALUES)
 const familyAffluenceValues = Object.values(FAMILY_AFFLUENCE)
 const createdByValues = Object.values(PROFILE_CREATED_BY)
 
-const sanitizeGender = (val) => (typeof val === "string" ? val.trim().toLowerCase() : val)
+const sanitizeGender = (val) => {
+    if (!val || typeof val !== "string") return undefined
+    const s = val.trim().toLowerCase()
+    return genderValues.includes(s) ? s : undefined
+}
 const sanitizeMaritalStatus = (val) => {
-    if (typeof val !== "string") return val
+    if (!val || typeof val !== "string") return undefined
     const s = val.trim().toLowerCase().replace(/[\s-]+/g, "_")
     if (s === "never" || s === "never_married") return "never_married"
-    return s
+    return maritalStatusValues.includes(s) ? s : undefined
 }
 const sanitizeFamilyType = (val) => {
-    if (typeof val !== "string") return val
+    if (!val || typeof val !== "string") return undefined
     const s = val.trim().toLowerCase()
     if (s === "other" || s.includes("extended")) return "extended"
-    return s
+    return familyTypeValues.includes(s) ? s : undefined
 }
-const sanitizeFamilyValues = (val) => (typeof val === "string" ? val.trim().toLowerCase() : val)
+const sanitizeFamilyValues = (val) => {
+    if (!val || typeof val !== "string") return undefined
+    const s = val.trim().toLowerCase()
+    return familyValuesValues.includes(s) ? s : undefined
+}
 const sanitizeFamilyAffluence = (val) => {
-    if (typeof val !== "string") return val
+    if (!val || typeof val !== "string") return undefined
     const s = val.trim().toLowerCase().replace(/[\s-]+/g, "_")
     if (s.includes("upper_middle")) return "upper_middle"
     if (s.includes("lower_middle")) return "lower_middle"
     if (s.includes("middle")) return "middle"
     if (s.includes("affluent") || s.includes("rich")) return "affluent"
-    return s
+    return familyAffluenceValues.includes(s) ? s : undefined
 }
 
 export const createProfile = [
@@ -39,16 +47,12 @@ export const createProfile = [
         .isLength({ min: 1, max: 100 })
         .withMessage("Name must be between 1 and 100 characters"),
     body("dateOfBirth")
-        .notEmpty()
-        .withMessage("Date of birth is required")
+        .optional({ values: "falsy" })
         .isISO8601()
         .withMessage("Invalid date format"),
     body("gender")
-        .notEmpty()
-        .withMessage("Gender is required")
-        .customSanitizer(sanitizeGender)
-        .isIn(genderValues)
-        .withMessage(`Gender must be one of: ${genderValues.join(", ")}`),
+        .optional({ values: "falsy" })
+        .customSanitizer(sanitizeGender),
     body("heightCm")
         .optional({ values: "falsy" })
         .isFloat({ min: 100, max: 250 })

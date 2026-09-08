@@ -54,13 +54,14 @@ authApi.interceptors.response.use(
  * Register a new user:
  * Sends email verification link via Nodemailer
  */
-export const registerUser = async ({ name, email, password, phone, gender }) => {
+export const registerUser = async ({ name, email, password, phone, gender, location }) => {
     const res = await authApi.post("/register", {
         name,
         email,
         password,
         phone,
         gender,
+        location,
     })
     return unwrap(res)
 }

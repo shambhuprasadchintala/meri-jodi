@@ -105,7 +105,7 @@ class AuthService {
      * Register a new user:
      * Stores pending user data in Redis (10 min TTL) and sends verification email via Nodemailer.
      */
-    async registerUser({ name, email, password, phone, gender, reqIp = "127.0.0.1" }) {
+    async registerUser({ name, email, password, phone, gender, location, reqIp = "127.0.0.1" }) {
         const cleanEmail = email.toLowerCase().trim()
 
         // 1. Rate limiting via Redis (relaxed to 5s to avoid locking users out on retries)
@@ -134,12 +134,16 @@ class AuthService {
         const verifyCodeKey = `verify-code:${verifyOtp}`
         const verifyOtpKey = `verify-otp:${cleanEmail}`
 
+        const cleanGender = gender ? gender.toLowerCase().trim() : undefined
+        const cleanLocation = location ? location.trim() : undefined
+
         const userData = {
             name: name.trim(),
             email: cleanEmail,
             passwordHash,
             phone: phone ? phone.trim() : undefined,
-            gender: gender || "male",
+            gender: cleanGender || "female",
+            location: cleanLocation,
             otp: verifyOtp,
             token: verifyToken,
         }
@@ -268,18 +272,21 @@ class AuthService {
                 email: userData.email,
                 passwordHash: userData.passwordHash,
                 phone: phoneToSet,
+                gender: userData.gender,
+                location: userData.location,
                 isEmailVerified: true,
                 status: USER_STATUS.ACTIVE,
                 lastLogin: new Date(),
             })
 
-            // Automatically create initial profile
+            // Automatically create initial profile with verified gender and location
             await Profile.findOneAndUpdate(
                 { userId: user._id },
                 {
                     userId: user._id,
                     name: user.name,
-                    gender: userData.gender || "male",
+                    gender: userData.gender || "female",
+                    location: userData.location ? { city: userData.location, country: "India" } : undefined,
                     isVerified: true,
                 },
                 { upsert: true, new: true, setDefaultsOnInsert: true }
@@ -288,7 +295,19 @@ class AuthService {
             user.isEmailVerified = true
             user.lastLogin = new Date()
             if (userData.passwordHash) user.passwordHash = userData.passwordHash
+            if (userData.gender) user.gender = userData.gender
+            if (userData.location) user.location = userData.location
             await user.save()
+
+            if (userData.gender || userData.location) {
+                await Profile.findOneAndUpdate(
+                    { userId: user._id },
+                    {
+                        ...(userData.gender ? { gender: userData.gender } : {}),
+                        ...(userData.location ? { "location.city": userData.location } : {}),
+                    }
+                )
+            }
         }
 
         // Generate tokens and cookies
