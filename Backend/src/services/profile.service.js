@@ -17,6 +17,7 @@ const PROFILE_CREATE_FIELDS = [
     "heightCm",
     "religion",
     "caste",
+    "subCaste",
     "gotham",
     "rashi",
     "nakshtra",
@@ -29,6 +30,7 @@ const PROFILE_CREATE_FIELDS = [
     "family",
     "lifestyle",
     "hobbiesAndInterests",
+    "isPhotoHidden",
     "createdBy",
     "agreedToTerms",
     "agreedToPrivacyPolicy",
@@ -46,6 +48,7 @@ const PROFILE_UPDATE_FIELDS = [
     "heightCm",
     "religion",
     "caste",
+    "subCaste",
     "gotham",
     "rashi",
     "nakshtra",
@@ -58,6 +61,7 @@ const PROFILE_UPDATE_FIELDS = [
     "family",
     "lifestyle",
     "hobbiesAndInterests",
+    "isPhotoHidden",
     "createdBy",
     "agreedToTerms",
     "agreedToPrivacyPolicy",
@@ -115,24 +119,31 @@ class ProfileService {
             }
         }
 
-        if (normalized.diet !== undefined || normalized.smoking !== undefined || normalized.drinking !== undefined) {
+        if (normalized.diet !== undefined || normalized.smoking !== undefined || normalized.drinking !== undefined || normalized.habits !== undefined || normalized.fitness !== undefined) {
             normalized.lifestyle = {
                 ...(typeof normalized.lifestyle === "object" ? normalized.lifestyle : {}),
                 ...(normalized.diet !== undefined ? { diet: normalized.diet } : {}),
                 ...(normalized.smoking !== undefined ? { smoking: normalized.smoking === true || normalized.smoking === "true" } : {}),
                 ...(normalized.drinking !== undefined ? { drinking: normalized.drinking === true || normalized.drinking === "true" } : {}),
+                ...(normalized.habits !== undefined ? { habits: normalized.habits } : {}),
+                ...(normalized.fitness !== undefined ? { fitness: normalized.fitness } : {}),
             }
         }
 
-        if (normalized.fatherOccupation || normalized.motherOccupation || normalized.familyType || normalized.familyValues || normalized.familyAffluence) {
+        if (normalized.fatherOccupation || normalized.motherOccupation || normalized.familyType || normalized.familyValues || normalized.familyAffluence || normalized.familyLocation) {
             normalized.family = {
                 ...(typeof normalized.family === "object" ? normalized.family : {}),
                 ...(normalized.fatherOccupation?.trim() ? { fatherOccupation: normalized.fatherOccupation.trim() } : {}),
                 ...(normalized.motherOccupation?.trim() ? { motherOccupation: normalized.motherOccupation.trim() } : {}),
-                ...(normalized.familyType?.trim() ? { familyType: normalized.familyType.trim() } : {}),
-                ...(normalized.familyValues?.trim() ? { familyValues: normalized.familyValues.trim() } : {}),
-                ...(normalized.familyAffluence?.trim() ? { familyAffluence: normalized.familyAffluence.trim() } : {}),
+                ...(normalized.familyLocation?.trim() ? { familyLocation: normalized.familyLocation.trim() } : {}),
+                ...(normalized.familyType ? { familyType: String(normalized.familyType).trim().toLowerCase() } : {}),
+                ...(normalized.familyValues ? { familyValues: String(normalized.familyValues).trim().toLowerCase() } : {}),
+                ...(normalized.familyAffluence ? { familyAffluence: String(normalized.familyAffluence).trim().toLowerCase() } : {}),
             }
+        }
+
+        if (normalized.isPhotoHidden !== undefined) {
+            normalized.isPhotoHidden = normalized.isPhotoHidden === true || normalized.isPhotoHidden === "true"
         }
 
         return normalized

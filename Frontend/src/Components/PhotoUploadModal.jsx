@@ -1,19 +1,43 @@
-import { useState, useRef } from "react"
-import { X, Upload, Trash2, Star, Image as ImageIcon, Check } from "lucide-react"
+import { useState, useRef, useEffect } from "react"
+import { X, Upload, Trash2, Star, Image as ImageIcon, Check, Eye, EyeOff, Lock, Shield } from "lucide-react"
 import { uploadPhoto, deletePhoto, setPrimaryPhoto } from "../api/photoApi"
+import { updateProfile } from "../api/profileApi"
 import ConfirmModal from "./ConfirmModal"
 
-export default function PhotoUploadModal({ isOpen, photos = [], onClose, onPhotosUpdated }) {
+export default function PhotoUploadModal({ isOpen, photos = [], isPhotoHidden = false, onClose, onPhotosUpdated }) {
     const [selectedFile, setSelectedFile] = useState(null)
     const [previewUrl, setPreviewUrl] = useState("")
     const [isPrimary, setIsPrimary] = useState(false)
+    const [photoHidden, setPhotoHidden] = useState(isPhotoHidden)
+    const [privacyLoading, setPrivacyLoading] = useState(false)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
     const [successMsg, setSuccessMsg] = useState("")
     const [deletePhotoId, setDeletePhotoId] = useState(null)
     const fileInputRef = useRef(null)
 
+    useEffect(() => {
+        setPhotoHidden(Boolean(isPhotoHidden))
+    }, [isPhotoHidden, isOpen])
+
     if (!isOpen) return null
+
+    const handleTogglePrivacy = async () => {
+        setPrivacyLoading(true)
+        setError("")
+        setSuccessMsg("")
+        try {
+            const nextVal = !photoHidden
+            const res = await updateProfile({ isPhotoHidden: nextVal })
+            setPhotoHidden(nextVal)
+            setSuccessMsg(nextVal ? "Photos hidden from other members" : "Photos visible to other members")
+            if (onPhotosUpdated) onPhotosUpdated(res)
+        } catch (err) {
+            setError(err.response?.data?.message || "Failed to update photo privacy.")
+        } finally {
+            setPrivacyLoading(false)
+        }
+    }
 
     const handleFileSelect = (e) => {
         const file = e.target.files?.[0]
@@ -121,6 +145,46 @@ export default function PhotoUploadModal({ isOpen, photos = [], onClose, onPhoto
                             <Check size={16} /> {successMsg}
                         </div>
                     )}
+
+                    {/* Photo Privacy Toggle Card */}
+                    <div className="bg-rose-50/50 border border-rose-100 rounded-2xl p-4 flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${photoHidden ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-[#842029]'}`}>
+                                {photoHidden ? <EyeOff size={20} /> : <Eye size={20} />}
+                            </div>
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <h4 className="text-sm font-bold text-gray-900">
+                                        Hide Photos from Other Members
+                                    </h4>
+                                    {photoHidden && (
+                                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                                            Hidden
+                                        </span>
+                                    )}
+                                </div>
+                                <p className="text-xs text-gray-500">
+                                    {photoHidden
+                                        ? "Your photos are currently hidden from other users on MeriJodi."
+                                        : "Your photos are visible to prospective matches."}
+                                </p>
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={handleTogglePrivacy}
+                            disabled={privacyLoading}
+                            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                                photoHidden ? 'bg-[#842029]' : 'bg-gray-300'
+                            }`}
+                        >
+                            <span
+                                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                                    photoHidden ? 'translate-x-5' : 'translate-x-0'
+                                }`}
+                            />
+                        </button>
+                    </div>
 
                     {/* Upload Section */}
                     {photos.length < 6 && (

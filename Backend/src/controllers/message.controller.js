@@ -6,11 +6,11 @@ import profileService from "../services/profile.service.js"
 class MessageController extends BaseController {
     async sendMessage(req, res, next) {
         try {
-            const senderProfile = await profileService.getByUserId(
+            let senderProfile = await profileService.getByUserId(
                 req.user._id
             )
             if (!senderProfile) {
-                return this.sendError(res, "Profile not found", 404)
+                senderProfile = await profileService.create(req.user._id, { name: req.user.name })
             }
 
             const message = await messageService.send(
@@ -46,9 +46,9 @@ class MessageController extends BaseController {
 
     async getConversation(req, res, next) {
         try {
-            const profile = await profileService.getByUserId(req.user._id)
+            let profile = await profileService.getByUserId(req.user._id)
             if (!profile) {
-                return this.sendError(res, "Profile not found", 404)
+                return this.sendSuccess(res, [], "Conversation retrieved")
             }
 
             const messages = await messageService.getConversation(
@@ -74,7 +74,7 @@ class MessageController extends BaseController {
         try {
             const profile = await profileService.getByUserId(req.user._id)
             if (!profile) {
-                return this.sendError(res, "Profile not found", 404)
+                return this.sendSuccess(res, null, "Message marked as read")
             }
 
             const message = await messageService.markAsRead(
@@ -96,7 +96,7 @@ class MessageController extends BaseController {
         try {
             const profile = await profileService.getByUserId(req.user._id)
             if (!profile) {
-                return this.sendError(res, "Profile not found", 404)
+                return this.sendSuccess(res, { unreadCount: 0 }, "Unread count retrieved")
             }
 
             const count = await messageService.getUnreadCount(
@@ -113,7 +113,7 @@ class MessageController extends BaseController {
         try {
             const profile = await profileService.getByUserId(req.user._id)
             if (!profile) {
-                return this.sendError(res, "Profile not found", 404)
+                return this.sendSuccess(res, [], "Conversations retrieved")
             }
 
             const conversations = await messageService.getConversations(

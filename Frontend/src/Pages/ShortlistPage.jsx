@@ -163,7 +163,7 @@ export default function ShortlistPage() {
                                     <div className="p-5 flex-1 flex flex-col justify-between">
                                         <div>
                                             <h2 className="text-xl font-bold text-[#640515] font-serif">
-                                                {name}{age ? `, ${age}` : ""}
+                                                {name}{age ? `, Age: ${age}` : ""}
                                             </h2>
                                             <div className="mt-2 space-y-1.5 text-xs text-gray-600">
                                                 <p className="flex items-center gap-1.5">

@@ -59,3 +59,39 @@ export const updateAdminReportStatus = async (id, status, resolutionNotes = "") 
     return res.data?.data || res.data
 }
 
+export const updateAdminUserProfile = async (id, data) => {
+    const res = await axiosInstance.put(`/admin/users/${id}/profile`, data)
+    return res.data?.data || res.data
+}
+
+export const getAdminUserSubscriptions = async (id) => {
+    const res = await axiosInstance.get(`/admin/users/${id}/subscriptions`)
+    return res.data?.data || res.data
+}
+
+export const addAdminUserSubscription = async (id, data) => {
+    const res = await axiosInstance.post(`/admin/users/${id}/subscriptions`, data)
+    return res.data?.data || res.data
+}
+
+export const updateAdminSubscriptionStatus = async (subId, status) => {
+    const res = await axiosInstance.put(`/admin/subscriptions/${subId}/status`, { status })
+    return res.data?.data || res.data
+}
+
+export const getAdminProfileSettings = async () => {
+    const res = await axiosInstance.get("/admin/settings/profile")
+    return res.data?.data || res.data
+}
+
+export const updateAdminProfileSettings = async (data) => {
+    const res = await axiosInstance.put("/admin/settings/profile", data)
+    return res.data?.data || res.data
+}
+
+export const updateAdminPasswordSettings = async (data) => {
+    const res = await axiosInstance.put("/admin/settings/password", data)
+    return res.data?.data || res.data
+}
+
+

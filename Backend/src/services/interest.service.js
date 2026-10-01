@@ -137,7 +137,7 @@ class InterestService {
             .sort({ createdAt: -1 })
             .populate({
                 path: "receiverProfileId",
-                select: "name gender location photos dateOfBirth religion caste career education aboutMe maritalStatus",
+                select: "name gender location photos dateOfBirth religion caste career education aboutMe maritalStatus isPhotoHidden",
                 populate: { path: "userId", select: "name avatar" },
             })
             .lean()
@@ -149,6 +149,9 @@ class InterestService {
                     item.receiverProfileId.name ||
                     item.receiverProfileId.userId?.name ||
                     "MeriJodi Member"
+                if (item.receiverProfileId.isPhotoHidden) {
+                    item.receiverProfileId.photos = []
+                }
                 return item
             })
     }
@@ -163,7 +166,7 @@ class InterestService {
             .sort({ createdAt: -1 })
             .populate({
                 path: "senderProfileId",
-                select: "name gender location photos dateOfBirth religion caste career education aboutMe maritalStatus",
+                select: "name gender location photos dateOfBirth religion caste career education aboutMe maritalStatus isPhotoHidden",
                 populate: { path: "userId", select: "name avatar" },
             })
             .lean()
@@ -175,6 +178,9 @@ class InterestService {
                     item.senderProfileId.name ||
                     item.senderProfileId.userId?.name ||
                     "MeriJodi Member"
+                if (item.senderProfileId.isPhotoHidden) {
+                    item.senderProfileId.photos = []
+                }
                 return item
             })
     }

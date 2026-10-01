@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react"
-import { X, Loader, Sparkles, Plus, Check } from "lucide-react"
+import { X, Loader, Plus, Check } from "lucide-react"
 import {
   updateProfile,
-  generateAIBio,
   buildPersonalDetailsPayload,
   buildFamilyPayload,
   buildCareerEducationPayload,
@@ -21,10 +20,32 @@ const MONTHS = [
 ]
 
 const POPULAR_HOBBIES = [
-  "Traveling", "Cooking", "Reading", "Music", "Fitness & Gym",
-  "Photography", "Cricket", "Yoga & Meditation", "Technology",
-  "Art & Painting", "Movies & Cinema", "Gaming", "Pet Lover",
-  "Writing", "Dancing", "Trekking",
+  "Acting",
+  "Adventure Sports",
+  "Baking",
+  "Alternative Healing/medicine",
+  "Art/Handicraft",
+  "Bike/car Enthusiast",
+  "Book Clubs",
+  "Cooking",
+  "Dancing",
+  "Fitness & Gym",
+  "Gardening",
+  "Gaming",
+  "Movies & Cinema",
+  "Music",
+  "Pet Lover",
+  "Photography",
+  "Reading",
+  "Swimming",
+  "Technology",
+  "Traveling",
+  "Trekking",
+  "Writing",
+  "Yoga & Meditation",
+  "Badminton",
+  "Cricket",
+  "Volunteering",
 ]
 
 const SECTIONS = [
@@ -39,7 +60,6 @@ const SECTIONS = [
 const EditProfileModal = ({ isOpen, section: initialSection = "personal", profile, onClose, onSuccess }) => {
   const [activeSection, setActiveSection] = useState(initialSection || "personal")
   const [loading, setLoading] = useState(false)
-  const [aiLoading, setAiLoading] = useState(false)
   const [error, setError] = useState(null)
   const [customHobby, setCustomHobby] = useState("")
   const [formData, setFormData] = useState({})
@@ -151,33 +171,6 @@ const EditProfileModal = ({ isOpen, section: initialSection = "personal", profil
     setCustomHobby("")
   }
 
-  const handleGenerateBio = async () => {
-    setAiLoading(true)
-    setError(null)
-    try {
-      const generated = await generateAIBio({
-        name: formData.name || profile?.name,
-        gender: formData.gender,
-        age: formData.year ? new Date().getFullYear() - Number(formData.year) : undefined,
-        occupation: formData.occupation,
-        education: formData.education,
-        companyName: formData.companyName,
-        city: formData.location,
-        hobbies: formData.hobbiesAndInterests,
-        religion: formData.religion,
-        diet: formData.diet,
-        familyValues: formData.familyValues,
-      })
-      if (generated) {
-        setFormData((prev) => ({ ...prev, aboutMe: generated }))
-      }
-    } catch (err) {
-      setError("AI generation failed. Please write your bio manually.")
-    } finally {
-      setAiLoading(false)
-    }
-  }
-
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError(null)
@@ -190,9 +183,16 @@ const EditProfileModal = ({ isOpen, section: initialSection = "personal", profil
         case "personal":
           payload = buildPersonalDetailsPayload(formData)
           break
-        case "about":
-          payload = { aboutMe: formData.aboutMe?.trim() || "" }
+        case "about": {
+          const bio = formData.aboutMe?.trim() || ""
+          if (bio && (bio.length < 50 || bio.length > 250)) {
+            setError(`Bio must be between 50 and 250 characters (currently ${bio.length} characters).`)
+            setLoading(false)
+            return
+          }
+          payload = { aboutMe: bio }
           break
+        }
         case "family":
           payload = buildFamilyPayload(formData)
           break
@@ -469,30 +469,29 @@ const EditProfileModal = ({ isOpen, section: initialSection = "personal", profil
           {/* 2. ABOUT & BIO */}
           {activeSection === "about" && (
             <div className="space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
+              <div>
+                <div className="flex items-center justify-between mb-1">
                   <label className="block text-xs font-bold text-gray-800">
                     About Yourself &amp; Partner Expectations
                   </label>
-                  <p className="text-[11px] text-gray-500">
-                    Share your values, background, personality, and life goals.
-                  </p>
+                  <span className={`text-[11px] font-semibold ${
+                    (formData.aboutMe || "").length === 0 ? "text-gray-400" :
+                    (formData.aboutMe || "").length < 50 ? "text-amber-600" :
+                    (formData.aboutMe || "").length > 250 ? "text-red-600" :
+                    "text-emerald-600"
+                  }`}>
+                    {(formData.aboutMe || "").length}/250 chars {(formData.aboutMe || "").length < 50 ? `(${50 - (formData.aboutMe || "").length} more needed)` : ""}
+                  </span>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleGenerateBio}
-                  disabled={aiLoading}
-                  className="px-3.5 py-1.5 rounded-full bg-gradient-to-r from-rose-500 to-[#842029] text-white text-xs font-semibold hover:opacity-95 transition-opacity flex items-center gap-1.5 shadow-xs disabled:opacity-50 cursor-pointer"
-                >
-                  {aiLoading ? <Loader size={13} className="animate-spin" /> : <Sparkles size={13} />}
-                  {aiLoading ? "Generating Bio..." : "✨ Generate with AI"}
-                </button>
+                <p className="text-[11px] text-gray-500 mb-2">
+                  Share your values, background, personality, and life goals (50 - 250 characters).
+                </p>
               </div>
 
               <textarea
                 name="aboutMe"
                 rows={7}
-                placeholder="Write a warm, authentic summary about who you are, your passions, family background, and the kind of life partner you are looking for..."
+                placeholder="Write a warm, authentic summary about who you are, your passions, family background, and the kind of life partner you are looking for (50-250 chars)..."
                 value={formData.aboutMe || ""}
                 onChange={handleChange}
                 className="w-full border border-gray-200 rounded-2xl p-4 text-xs sm:text-sm leading-relaxed focus:outline-none focus:border-[#842029]"

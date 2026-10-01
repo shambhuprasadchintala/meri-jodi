@@ -5,9 +5,9 @@ import profileService from "../services/profile.service.js"
 class BlockController extends BaseController {
     async blockUser(req, res, next) {
         try {
-            const profile = await profileService.getByUserId(req.user._id)
+            let profile = await profileService.getByUserId(req.user._id)
             if (!profile) {
-                return this.sendError(res, "Profile not found", 404)
+                profile = await profileService.create(req.user._id, { name: req.user.name })
             }
 
             const targetId = req.body.profileId || req.body.blockedProfileId
@@ -30,9 +30,9 @@ class BlockController extends BaseController {
 
     async unblockUser(req, res, next) {
         try {
-            const profile = await profileService.getByUserId(req.user._id)
+            let profile = await profileService.getByUserId(req.user._id)
             if (!profile) {
-                return this.sendError(res, "Profile not found", 404)
+                profile = await profileService.create(req.user._id, { name: req.user.name })
             }
 
             await blockService.unblock(
@@ -50,7 +50,7 @@ class BlockController extends BaseController {
         try {
             const profile = await profileService.getByUserId(req.user._id)
             if (!profile) {
-                return this.sendError(res, "Profile not found", 404)
+                return this.sendSuccess(res, [], "Blocked users retrieved")
             }
 
             const blocked = await blockService.getBlocked(

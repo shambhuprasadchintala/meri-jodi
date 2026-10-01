@@ -5,9 +5,9 @@ import profileService from "../services/profile.service.js"
 class MatchingController extends BaseController {
     async getMyMatches(req, res, next) {
         try {
-            const profile = await profileService.getByUserId(req.user._id)
+            let profile = await profileService.getByUserId(req.user._id)
             if (!profile) {
-                return this.sendError(res, "Profile not found", 404)
+                profile = await profileService.create(req.user._id, { name: req.user.name })
             }
 
             const result = await matchingService.findMatches(

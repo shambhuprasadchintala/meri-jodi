@@ -504,6 +504,12 @@ const AddDetailsManually = () => {
         formData.city
       ) {
         try {
+          const locs = Array.isArray(formData.locations) && formData.locations.length > 0
+            ? formData.locations
+            : formData.city
+            ? formData.city.split(",").map((c) => c.trim()).filter(Boolean)
+            : undefined
+
           await updatePartnerPreferences({
             ageMin: formData.minAge ? Number(formData.minAge) : undefined,
             ageMax: formData.maxAge ? Number(formData.maxAge) : undefined,
@@ -512,7 +518,8 @@ const AddDetailsManually = () => {
             education: formData.partnereducation || undefined,
             occupation: formData.partneroccupation || undefined,
             annualIncome: formData.partnerincome || undefined,
-            location: formData.city || undefined,
+            locations: locs,
+            location: locs?.length ? locs.join(", ") : formData.city || undefined,
             hobbiesAndInterests:
               Array.isArray(formData.hobbies) && formData.hobbies.length > 0
                 ? formData.hobbies

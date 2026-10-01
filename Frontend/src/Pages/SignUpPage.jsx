@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react"
 import { useNavigate, useLocation, Link } from "react-router-dom"
+import { Eye, EyeOff } from "lucide-react"
 import { registerUser, verifyEmailToken, googleAuth } from "../api/authApi"
 import { useAuth } from "../context/AuthContext"
 import logo from "../assets/logo2.png"
-import { Eye, EyeOff } from "lucide-react"
+import OtpBoxInput from "../Components/OtpBoxInput"
 
 import { useGoogleLogin } from "@react-oauth/google"
 
@@ -26,6 +27,24 @@ const SignUpPage = () => {
     const [devOtp, setDevOtp] = useState("")
     const [verifyingOtp, setVerifyingOtp] = useState(false)
     const [otpError, setOtpError] = useState("")
+    const [resendTimer, setResendTimer] = useState(60)
+    const [canResend, setCanResend] = useState(false)
+
+    useEffect(() => {
+        let timer
+        if (successMsg && resendTimer > 0 && !canResend) {
+            timer = setInterval(() => {
+                setResendTimer((prev) => {
+                    if (prev <= 1) {
+                        setCanResend(true)
+                        return 0
+                    }
+                    return prev - 1
+                })
+            }, 1000)
+        }
+        return () => clearInterval(timer)
+    }, [successMsg, resendTimer, canResend])
 
     const handleSubmit = async (e) => {
         e.preventDefault()
@@ -52,7 +71,8 @@ const SignUpPage = () => {
                 location: locationCity.trim() || undefined,
                 phone: phone.trim() ? (phone.startsWith("+") ? phone.trim() : `+91${phone.trim()}`) : undefined,
             })
-            setOtpInput("")
+            setOtpInput(data.otp || "")
+            if (data.otp) setDevOtp(data.otp)
             setSuccessMsg(
                 data.message ||
                     "Registration successful! We have sent a verification code to your email. Please check your inbox."
@@ -207,32 +227,46 @@ const SignUpPage = () => {
 
 
 
-                            {/* Direct OTP input box */}
-                            <form onSubmit={handleOtpVerify} className="p-4 bg-[#FFF5F6] rounded-xl border border-[#FFE4E8] space-y-3">
-                                <label className="block text-xs font-bold text-[#842029] uppercase tracking-wider">
-                                    Enter 6-Digit Code from Email
+                            {/* Standardized 6-Digit OTP Box Input */}
+                            <form onSubmit={handleOtpVerify} className="p-5 bg-white rounded-2xl border border-rose-100 shadow-sm space-y-4">
+                                <label className="block text-xs font-bold text-[#842029] uppercase tracking-wider text-center">
+                                    Enter 6-Digit Verification Code
                                 </label>
-                                <input
-                                    type="text"
-                                    placeholder="e.g. 123456"
+                                
+                                <OtpBoxInput
                                     value={otpInput}
-                                    onChange={(e) => setOtpInput(e.target.value.trim())}
-                                    maxLength={6}
-                                    className="w-full text-center tracking-widest text-xl font-bold border-2 border-[#FFE4E8] focus:border-[#ED5463] rounded-xl px-4 py-2.5 outline-none bg-white transition-colors"
+                                    onChange={setOtpInput}
+                                    error={Boolean(otpError)}
+                                    idPrefix="signup-otp"
                                 />
+
                                 {otpError && (
-                                    <p className="text-xs text-red-600 font-semibold">{otpError}</p>
+                                    <p className="text-xs text-red-600 font-semibold text-center">{otpError}</p>
                                 )}
+
+                                <div className="text-center text-xs text-[#6B7280]">
+                                    Didn't receive the code?{" "}
+                                    {canResend ? (
+                                        <button
+                                            type="button"
+                                            onClick={handleSubmit}
+                                            className="text-[#ED5463] font-bold hover:underline"
+                                        >
+                                            Resend Code
+                                        </button>
+                                    ) : (
+                                        <span className="font-semibold text-gray-500">Resend in {resendTimer}s</span>
+                                    )}
+                                </div>
+
                                 <button
                                     type="submit"
-                                    disabled={!otpInput.trim() || verifyingOtp}
-                                    className="w-full rounded-full bg-[#ED5463] py-2.5 text-white font-semibold text-sm hover:bg-[#D4384B] disabled:opacity-50 transition-all shadow-sm cursor-pointer"
+                                    disabled={String(otpInput || "").length !== 6 || verifyingOtp}
+                                    className="w-full rounded-full bg-[#ED5463] py-3 text-white font-semibold text-sm hover:bg-[#D4384B] disabled:opacity-50 transition-all shadow-sm cursor-pointer"
                                 >
                                     {verifyingOtp ? "Verifying Code..." : "Verify Code & Start Setup →"}
                                 </button>
                             </form>
-
-
 
                             <div className="pt-3 border-t border-gray-100 flex justify-between items-center text-xs">
                                 <button

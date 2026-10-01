@@ -287,8 +287,25 @@ router.post("/reset-password/:token", sanitizeBody, async (req, res) => {
     const apiResponse = new ApiResponse(res)
     try {
         const { token } = req.params
-        const { newPassword } = req.body
-        const result = await authService.resetPassword({ token, newPassword })
+        const { newPassword, password } = req.body
+        const result = await authService.resetPassword({ token, newPassword: newPassword || password })
+        return apiResponse.success(result, result.message, 200)
+    } catch (error) {
+        return apiResponse.error(error.message, error.statusCode || 400)
+    }
+})
+
+/**
+ * POST /api/auth/reset-password
+ * Reset password using token or 6-digit OTP code in request body.
+ */
+router.post("/reset-password", sanitizeBody, async (req, res) => {
+    const apiResponse = new ApiResponse(res)
+    try {
+        const { token, code, otp, newPassword, password } = req.body
+        const tokenToUse = token || code || otp
+        const passToUse = newPassword || password
+        const result = await authService.resetPassword({ token: tokenToUse, newPassword: passToUse })
         return apiResponse.success(result, result.message, 200)
     } catch (error) {
         return apiResponse.error(error.message, error.statusCode || 400)

@@ -18,33 +18,21 @@ export const createOrUpdatePreferences = [
         .isInt({ min: 18, max: 80 })
         .withMessage("Maximum age must be between 18 and 80"),
     body("religion")
-        .optional({ values: "falsy" })
-        .trim()
-        .isLength({ min: 1, max: 50 }),
+        .optional({ values: "falsy" }),
     body("caste")
-        .optional({ values: "falsy" })
-        .trim()
-        .isLength({ min: 1, max: 50 }),
+        .optional({ values: "falsy" }),
     body("location")
-        .optional({ values: "falsy" })
-        .trim()
-        .isLength({ min: 1, max: 100 }),
+        .optional({ values: "falsy" }),
+    body("locations")
+        .optional({ values: "falsy" }),
     body("education")
-        .optional({ values: "falsy" })
-        .trim()
-        .isLength({ min: 1, max: 100 }),
+        .optional({ values: "falsy" }),
     body("occupation")
-        .optional({ values: "falsy" })
-        .trim()
-        .isLength({ min: 1, max: 100 }),
+        .optional({ values: "falsy" }),
     body("annualIncome")
-        .optional({ values: "falsy" })
-        .trim()
-        .isLength({ min: 1, max: 50 }),
+        .optional({ values: "falsy" }),
     body("diet")
-        .optional({ values: "falsy" })
-        .trim()
-        .isLength({ min: 1, max: 100 }),
+        .optional({ values: "falsy" }),
     body("heightMinCm")
         .optional({ values: "falsy" })
         .isFloat({ min: 100, max: 250 }),
@@ -56,5 +44,9 @@ export const createOrUpdatePreferences = [
     body("willingToRelocate")
         .optional({ values: "falsy" }),
     body("hobbiesAndInterests")
+        .optional({ values: "falsy" }),
+    body("ageRange")
+        .optional({ values: "falsy" }),
+    body("heightRange")
         .optional({ values: "falsy" }),
 ]

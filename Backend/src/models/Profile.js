@@ -38,6 +38,7 @@ const familySchema = new Schema(
     {
         fatherOccupation: String,
         motherOccupation: String,
+        familyLocation: String,
         numBrothers: { type: Number, default: 0 },
         numSisters: { type: Number, default: 0 },
         familyType: { type: String, enum: Object.values(FAMILY_TYPE) },
@@ -58,6 +59,8 @@ const lifestyleSchema = new Schema(
         diet: String,
         smoking: { type: Boolean, default: false },
         drinking: { type: Boolean, default: false },
+        habits: String,
+        fitness: String,
     },
     { _id: false }
 )
@@ -83,6 +86,7 @@ const profileSchema = new Schema(
         heightCm: Number,
         religion: String,
         caste: String,
+        subCaste: String,
         gotham: String,
         rashi: String,
         nakshtra: String,
@@ -110,6 +114,7 @@ const profileSchema = new Schema(
         ],
         profileCompletionPct: { type: Number, default: 0 },
         isVerified: { type: Boolean, default: false },
+        isPhotoHidden: { type: Boolean, default: false },
         createdBy: {
             type: String,
             enum: Object.values(PROFILE_CREATED_BY),

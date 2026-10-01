@@ -5,9 +5,9 @@ import profileService from "../services/profile.service.js"
 class VerificationController extends BaseController {
     async submitDocument(req, res, next) {
         try {
-            const profile = await profileService.getByUserId(req.user._id)
+            let profile = await profileService.getByUserId(req.user._id)
             if (!profile) {
-                return this.sendError(res, "Profile not found", 404)
+                profile = await profileService.create(req.user._id, { name: req.user.name })
             }
 
             const verification = await verificationService.submit(
@@ -37,7 +37,7 @@ class VerificationController extends BaseController {
         try {
             const profile = await profileService.getByUserId(req.user._id)
             if (!profile) {
-                return this.sendError(res, "Profile not found", 404)
+                return this.sendSuccess(res, null, "No verification found")
             }
             const verification = await verificationService.getByProfileId(profile._id.toString())
             return this.sendSuccess(res, verification, "Verification status retrieved")

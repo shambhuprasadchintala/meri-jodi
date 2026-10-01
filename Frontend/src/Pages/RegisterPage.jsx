@@ -5,13 +5,14 @@ import { verifyOtp, sendOtp } from "../api/authApi"
 import registerPageImage from "../assets/login-image.png"
 import logo from "../assets/logo2.png"
 import secure from "../assets/secure.png"
+import OtpBoxInput from "../Components/OtpBoxInput"
 
 const RegisterPage = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const { signIn } = useAuth()
   const { phone, name } = location.state || {}
-  const [otp, setOtp] = useState(["", "", "", "", "", ""])
+  const [otp, setOtp] = useState("")
   const [loading, setLoading] = useState(false)
   const [resendTimer, setResendTimer] = useState(60)
   const [canResend, setCanResend] = useState(false)
@@ -34,26 +35,10 @@ const RegisterPage = () => {
     return () => clearInterval(timer)
   }, [resendTimer, canResend])
 
-  const handleOtpChange = (index, value) => {
-    if (!/^\d?$/.test(value)) return
-    const newOtp = [...otp]
-    newOtp[index] = value
-    setOtp(newOtp)
-    if (value && index < 5) {
-      document.getElementById(`otp-${index + 1}`)?.focus()
-    }
-  }
-
-  const handleBackspace = (index, e) => {
-    if (e.key === "Backspace" && !otp[index] && index > 0) {
-      document.getElementById(`otp-${index - 1}`)?.focus()
-    }
-  }
-
   const handleSubmit = async (e) => {
-    e.preventDefault()
+    if (e?.preventDefault) e.preventDefault()
     setError("")
-    const otpCode = otp.join("")
+    const otpCode = String(otp || "").trim()
     if (otpCode.length !== 6) {
       setError("Enter the full 6-digit code.")
       return
@@ -85,7 +70,7 @@ const RegisterPage = () => {
     }
   }
 
-  const isFormValid = otp.every((digit) => digit !== "")
+  const isFormValid = String(otp || "").trim().length === 6
 
   return (
     <div className="min-h-screen w-full flex bg-white">
@@ -123,22 +108,12 @@ const RegisterPage = () => {
               )}
             </div>
 
-            <div className="flex justify-center gap-4">
-              {otp.map((digit, index) => (
-                <input
-                  key={index}
-                  id={`otp-${index}`}
-                  type="text"
-                  maxLength="1"
-                  value={digit}
-                  onChange={(e) => handleOtpChange(index, e.target.value)}
-                  onKeyDown={(e) => handleBackspace(index, e)}
-                  className="w-14 h-14 text-center text-3xl font-bold border-2 border-[#D1D5DB] rounded-lg focus:border-[#ED5463] focus:outline-none transition-colors"
-                  placeholder="-"
-                  inputMode="numeric"
-                />
-              ))}
-            </div>
+            <OtpBoxInput
+              value={otp}
+              onChange={setOtp}
+              error={Boolean(error)}
+              idPrefix="register-otp"
+            />
 
             <div className="text-sm text-[#6B7280]">
               Resend OTP{" "}

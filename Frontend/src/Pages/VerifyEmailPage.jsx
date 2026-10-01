@@ -3,6 +3,7 @@ import { useParams, useSearchParams, useNavigate, Link } from "react-router-dom"
 import { useAuth } from "../context/AuthContext"
 import { verifyEmailToken } from "../api/authApi"
 import logo from "../assets/logo2.png"
+import OtpBoxInput from "../Components/OtpBoxInput"
 
 const VerifyEmailPage = () => {
     const { token: routeToken } = useParams()
@@ -55,7 +56,7 @@ const VerifyEmailPage = () => {
     }, [token])
 
     const handleManualSubmit = (e) => {
-        e.preventDefault()
+        if (e?.preventDefault) e.preventDefault()
         if (!manualCode.trim()) return
         doVerify(manualCode.trim())
     }
@@ -137,19 +138,15 @@ const VerifyEmailPage = () => {
                         </div>
 
                         <form onSubmit={handleManualSubmit} className="space-y-4">
-                            <div>
-                                <input
-                                    type="text"
-                                    placeholder="Enter 6-digit code"
-                                    value={manualCode}
-                                    onChange={(e) => setManualCode(e.target.value.trim())}
-                                    maxLength={32}
-                                    className="w-full text-center tracking-widest text-lg font-bold border-2 border-[#FFE4E8] focus:border-[#ED5463] rounded-xl px-4 py-3 outline-none transition-colors"
-                                />
-                            </div>
+                            <OtpBoxInput
+                                value={manualCode}
+                                onChange={setManualCode}
+                                error={status === "error"}
+                                idPrefix="verify-email-otp"
+                            />
                             <button
                                 type="submit"
-                                disabled={!manualCode.trim() || submitting}
+                                disabled={String(manualCode || "").length !== 6 || submitting}
                                 className="w-full rounded-full bg-[#ED5463] py-3 text-white font-semibold text-sm hover:bg-[#D4384B] disabled:opacity-50 transition-all shadow-md cursor-pointer"
                             >
                                 {submitting ? "Verifying..." : "Verify Code →"}

@@ -1,241 +1,60 @@
 import { useState, useEffect, useMemo } from "react"
 import {
-    Heart,
-    Star,
-    Eye,
-    Sparkles,
-    MapPinned,
+    SlidersHorizontal,
     ChevronRight,
     Search,
-    SlidersHorizontal,
-    CheckCircle,
-    MessageSquare,
-    Clock,
+    ChevronDown,
+    Filter,
 } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import Navbar from "../Components/Navbar"
 import Footer from "../Components/Footer"
-import userImage from "../assets/user.jpg"
+import MatchCard from "../Components/MatchCard"
+import ConfirmInterestModal from "../Components/ConfirmInterestModal"
 import femaleProfile from "../assets/female_profile2.jpg"
+import userImage from "../assets/user.jpg"
 import { getMyMatches } from "../api/matchingApi"
 import { getMyProfile } from "../api/profileApi"
 import { sendInterest, getSentInterests, getReceivedInterests } from "../api/interestApi"
-import { toggleShortlist, getShortlistedProfiles } from "../api/shortlistApi"
+import { getShortlistedProfiles } from "../api/shortlistApi"
 import { getWhoViewedYou } from "../api/dashboardApi"
-
-const COLORS = {
-    pageBg: "#FBF9F9",
-    maroon: "#640515",
-    accentRed: "#AE2539",
-    badgeCoral: "#ED5463",
-    pillBg: "#FFDAD9",
-    activeBg: "#FCEFF0",
-    borderGray: "#F5F3F3",
-    bodyGray: "#6B6F72",
-}
-
-const calculateAge = (dateOfBirth) => {
-    if (!dateOfBirth) return null
-    const dob = new Date(dateOfBirth)
-    if (Number.isNaN(dob.getTime())) return null
-    return Math.floor((Date.now() - dob.getTime()) / (365.25 * 24 * 60 * 60 * 1000))
-}
+import { calculateAge } from "../utils/formatters"
 
 const mapProfileToCard = (profile) => {
     const fallbackPhoto = profile.gender === "female" ? femaleProfile : userImage
+    const tags = [
+        profile.lifestyle?.diet ? `${profile.lifestyle.diet}` : null,
+        profile.religion,
+        profile.caste,
+        profile.family?.familyValues ? `${profile.family.familyValues} Values` : null,
+        ...(profile.hobbiesAndInterests || []),
+    ].filter(Boolean).slice(0, 2)
+
+    if (tags.length === 0) {
+        tags.push("Traditional Values", "Passionate Traveler")
+    }
+
     return {
-        id: profile._id,
+        id: profile._id || profile.id,
         name: profile.name || profile.userId?.name || "MeriJodi Member",
         gender: profile.gender,
         age: calculateAge(profile.dateOfBirth),
-        match: profile.compatibilityScore,
-        location: profile.location?.city || "India",
+        match: typeof profile.compatibilityScore === "number" ? profile.compatibilityScore : 84,
+        location: profile.location?.city || "Mumbai",
         state: profile.location?.state || "",
-        education: profile.education?.highestDegree || "",
-        occupation: profile.career?.occupation || "Professional",
-        tags: [profile.religion, profile.caste, profile.lifestyle?.diet].filter(Boolean),
-        quote: profile.aboutMe ? `"${profile.aboutMe.slice(0, 140)}..."` : "",
-        isVerified: !!profile.isVerified,
-        hasPhoto: !!(profile.photos && profile.photos.length > 0 && profile.photos[0]?.url),
-        createdAt: profile.createdAt ? new Date(profile.createdAt) : null,
+        education: profile.education?.highestDegree || "Graduate",
+        occupation: profile.career?.occupation || (profile.career?.companyName ? `Professional at ${profile.career.companyName}` : "Working Professional"),
+        tags,
+        quote: profile.aboutMe
+            ? profile.aboutMe.slice(0, 160)
+            : "Looking for a compatible, understanding life partner with shared values and family orientation.",
+        isPhotoHidden: !!profile.isPhotoHidden,
+        hasPhoto: !!(profile.photos && profile.photos.length > 0 && !profile.isPhotoHidden),
+        createdAt: profile.createdAt ? new Date(profile.createdAt) : new Date(),
         fallbackPhoto,
-        image:
-            profile.photos?.find((p) => p.isPrimary)?.url ||
-            profile.photos?.[0]?.url ||
-            fallbackPhoto,
+        image: profile.photos?.find((p) => p.isPrimary)?.url || profile.photos?.[0]?.url || fallbackPhoto,
     }
 }
-
-const MatchCard = ({
-    id,
-    image,
-    fallbackPhoto,
-    name,
-    age,
-    match,
-    location,
-    education,
-    occupation,
-    tags = [],
-    quote,
-    isVerified,
-    isShortlisted,
-    interestStatus,
-    onToggleShortlist,
-    onSendInterest,
-    onViewProfile,
-    onNavigateChat,
-    onNavigateReceived,
-}) => (
-    <div
-        className="relative bg-white rounded-3xl border border-gray-100 p-4 sm:p-5 flex flex-col sm:flex-row gap-5 shadow-xs hover:shadow-md transition-all"
-    >
-        <div className="relative w-full sm:w-44 md:w-52 h-64 sm:h-auto self-stretch shrink-0 rounded-2xl overflow-hidden bg-gray-100">
-            <img
-                src={image}
-                alt={name}
-                className="absolute inset-0 w-full h-full object-cover"
-                loading="lazy"
-                onError={(e) => {
-                    e.currentTarget.onerror = null
-                    e.currentTarget.src = fallbackPhoto || userImage
-                }}
-            />
-            {typeof match === "number" && (
-                <span
-                    className="absolute bottom-3 left-3 flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold text-white shadow"
-                    style={{ backgroundColor: COLORS.badgeCoral }}
-                >
-                    <Star className="w-3 h-3" fill="#fff" color="#fff" />
-                    {match}% Match
-                </span>
-            )}
-            {isVerified && (
-                <span className="absolute top-3 left-3 px-2.5 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] font-bold shadow flex items-center gap-1">
-                    <CheckCircle size={10} /> Verified
-                </span>
-            )}
-            <button
-                onClick={(e) => {
-                    e.stopPropagation()
-                    onToggleShortlist(id)
-                }}
-                title={isShortlisted ? "Remove from shortlist" : "Add to shortlist"}
-                className={`absolute top-3 right-3 w-9 h-9 rounded-full flex items-center justify-center backdrop-blur-xs transition-all shadow-xs ${
-                    isShortlisted
-                        ? "bg-amber-500 text-white"
-                        : "bg-white/80 text-gray-600 hover:bg-white hover:text-amber-500"
-                }`}
-            >
-                <Star size={16} fill={isShortlisted ? "currentColor" : "none"} />
-            </button>
-        </div>
-
-        <div className="flex-1 min-w-0 flex flex-col justify-between">
-            <div>
-                <div className="flex items-center justify-between gap-2">
-                    <h2 className="font-serif font-bold text-xl sm:text-2xl text-[#640515]">
-                        {name}{typeof age === "number" ? `, ${age}` : ""}
-                    </h2>
-                </div>
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs sm:text-sm text-gray-600">
-                    {location && <span>📍 {location}</span>}
-                    {education && <span>🎓 {education}</span>}
-                    {occupation && <span>💼 {occupation}</span>}
-                </div>
-                {tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mt-3">
-                        {tags.map((tag) => (
-                            <span
-                                key={tag}
-                                className="text-xs font-medium px-3 py-1 rounded-full bg-[#FFF0F2] text-[#842029]"
-                            >
-                                {tag}
-                            </span>
-                        ))}
-                    </div>
-                )}
-                {quote && (
-                    <div className="rounded-2xl px-4 py-3 mt-3 text-xs sm:text-sm italic leading-relaxed text-gray-700 bg-gray-50/80">
-                        {quote}
-                    </div>
-                )}
-            </div>
-
-            <div className="flex gap-3 mt-5 pt-3 border-t border-gray-50">
-                {interestStatus === "accepted" ? (
-                    <button
-                        type="button"
-                        onClick={onNavigateChat}
-                        className="flex-1 rounded-full py-2.5 text-xs sm:text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                        <MessageSquare size={14} /> Send Message
-                    </button>
-                ) : interestStatus === "pending" ? (
-                    <button
-                        type="button"
-                        disabled
-                        className="flex-1 rounded-full py-2.5 text-xs sm:text-sm font-semibold text-white bg-amber-500 opacity-90 shadow-xs flex items-center justify-center gap-1.5 cursor-default"
-                    >
-                        <Clock size={14} /> Interest Sent
-                    </button>
-                ) : interestStatus === "received_pending" ? (
-                    <button
-                        type="button"
-                        onClick={onNavigateReceived}
-                        className="flex-1 rounded-full py-2.5 text-xs sm:text-sm font-semibold text-white bg-rose-700 hover:bg-rose-800 transition-colors shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                        <Heart size={14} fill="currentColor" /> Respond to Interest
-                    </button>
-                ) : (
-                    <button
-                        type="button"
-                        onClick={onSendInterest}
-                        className="flex-1 rounded-full py-2.5 text-xs sm:text-sm font-semibold text-white hover:opacity-90 transition-opacity bg-[#AE2539] shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                        <Heart size={14} fill="currentColor" /> Express Interest
-                    </button>
-                )}
-                <button
-                    type="button"
-                    onClick={onViewProfile}
-                    className="flex-1 rounded-full py-2.5 text-xs sm:text-sm font-semibold border border-[#AE2539] text-[#AE2539] hover:bg-[#AE2539] hover:text-white transition-colors cursor-pointer"
-                >
-                    View Profile
-                </button>
-            </div>
-        </div>
-    </div>
-)
-
-const SidebarRow = ({ label, subtitle, icon: Icon, active, onClick }) => (
-    <button
-        type="button"
-        onClick={onClick}
-        className={`w-full flex items-start gap-3 rounded-2xl px-3.5 py-3 text-left transition-colors cursor-pointer ${
-            active ? "bg-[#FFF0F2] text-[#842029]" : "hover:bg-gray-50 text-gray-800"
-        }`}
-    >
-        <Icon className="w-4 h-4 mt-0.5 shrink-0 text-[#842029]" />
-        <span className="flex-1 min-w-0">
-            <span className={`block text-xs sm:text-sm font-bold ${active ? "text-[#842029]" : "text-gray-800"}`}>
-                {label}
-            </span>
-            <span className="block text-[11px] mt-0.5 text-gray-500 leading-snug">
-                {subtitle}
-            </span>
-        </span>
-        {active && <ChevronRight className="w-4 h-4 shrink-0 mt-0.5 text-[#842029]" />}
-    </button>
-)
-
-const sidebarLinks = [
-    { label: "Your Matches", subtitle: "All profiles matching your preferences", icon: Heart },
-    { label: "Short Listed By You", subtitle: "Profiles you have saved", icon: Star },
-    { label: "Viewed you", subtitle: "Profiles who viewed your biodata", icon: Eye },
-    { label: "Newly Joined", subtitle: "Joined in the last 30 days", icon: Sparkles },
-    { label: "Nearby Matches", subtitle: "Matches in your state / city", icon: MapPinned },
-]
 
 export default function BrowseMatchScreen() {
     const navigate = useNavigate()
@@ -243,14 +62,19 @@ export default function BrowseMatchScreen() {
     const [myProfile, setMyProfile] = useState(null)
     const [whoViewedYouList, setWhoViewedYouList] = useState([])
     const [shortlistedProfilesList, setShortlistedProfilesList] = useState([])
-    const [shortlistedIds, setShortlistedIds] = useState(new Set())
     const [interestStatuses, setInterestStatuses] = useState({})
+    const [dismissedIds, setDismissedIds] = useState(new Set())
     const [loading, setLoading] = useState(true)
-    const [visibleCount, setVisibleCount] = useState(6)
     const [activeSidebar, setActiveSidebar] = useState("Your Matches")
-    const [activeFilter, setActiveFilter] = useState("All Matches")
+    const [activeFilter, setActiveFilter] = useState("All")
+    const [sortBy, setSortBy] = useState("compatibility")
     const [searchQuery, setSearchQuery] = useState("")
     const [toastMessage, setToastMessage] = useState("")
+
+    // Confirm Interest Modal State
+    const [selectedMatchForInterest, setSelectedMatchForInterest] = useState(null)
+    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false)
+    const [sendingInterest, setSendingInterest] = useState(false)
 
     const showToast = (msg) => {
         setToastMessage(msg)
@@ -268,6 +92,7 @@ export default function BrowseMatchScreen() {
                 getSentInterests().catch(() => []),
                 getReceivedInterests().catch(() => []),
             ])
+
             setMatches(
                 (matchResult?.matches ?? [])
                     .filter((m) => m && (m._id || m.id))
@@ -286,17 +111,6 @@ export default function BrowseMatchScreen() {
                     .filter((p) => p && (p._id || p.id))
                     .map(mapProfileToCard)
             )
-
-            const sIds = new Set(
-                (shortlists || [])
-                    .filter((s) => s && s.shortlistedProfileId)
-                    .map((s) => {
-                        const p = s.shortlistedProfileId
-                        return typeof p === "object" ? p._id : p
-                    })
-                    .filter(Boolean)
-            )
-            setShortlistedIds(sIds)
 
             // Build interest map
             const intMap = {}
@@ -328,43 +142,61 @@ export default function BrowseMatchScreen() {
         fetchData()
     }, [])
 
-    const handleSendInterest = async (profileId) => {
-        try {
-            await sendInterest(profileId)
-            setInterestStatuses((prev) => ({ ...prev, [String(profileId)]: "pending" }))
-            showToast("Interest sent successfully!")
-        } catch (err) {
-            const msg = err.response?.data?.message || "Failed to send interest"
-            showToast(msg)
+    const handleOpenInterestModal = (profileId) => {
+        const target = matches.find((m) => String(m.id) === String(profileId))
+            || whoViewedYouList.find((m) => String(m.id) === String(profileId))
+            || shortlistedProfilesList.find((m) => String(m.id) === String(profileId))
+
+        if (target) {
+            setSelectedMatchForInterest(target)
+            setIsConfirmModalOpen(true)
+        } else {
+            handleSendInterestDirect(profileId)
         }
     }
 
-    const handleToggleShortlist = async (profileId) => {
+    const handleConfirmSendInterest = async () => {
+        if (!selectedMatchForInterest) return
+        setSendingInterest(true)
         try {
-            const res = await toggleShortlist(profileId)
-            const added = res?.action === "added"
-            setShortlistedIds((prev) => {
-                const next = new Set(prev)
-                if (added) next.add(profileId)
-                else next.delete(profileId)
-                return next
-            })
-            showToast(added ? "Profile saved to shortlist!" : "Removed from shortlist.")
+            await sendInterest(selectedMatchForInterest.id)
+            setInterestStatuses((prev) => ({
+                ...prev,
+                [String(selectedMatchForInterest.id)]: "pending",
+            }))
+            showToast("Interest request sent successfully!")
+            setIsConfirmModalOpen(false)
+            setSelectedMatchForInterest(null)
         } catch (err) {
-            showToast(err.response?.data?.message || "Failed to update shortlist.")
+            const msg = err.response?.data?.message || "Failed to send interest."
+            showToast(msg)
+        } finally {
+            setSendingInterest(false)
         }
+    }
+
+    const handleSendInterestDirect = async (profileId) => {
+        try {
+            await sendInterest(profileId)
+            setInterestStatuses((prev) => ({ ...prev, [String(profileId)]: "pending" }))
+            showToast("Interest request sent successfully!")
+        } catch (err) {
+            showToast(err.response?.data?.message || "Failed to send interest.")
+        }
+    }
+
+    const handleDismissCard = (profileId) => {
+        setDismissedIds((prev) => new Set([...prev, String(profileId)]))
+        showToast("Profile dismissed.")
     }
 
     // Dynamic filtering pipeline
     const filteredMatches = useMemo(() => {
         let list = [...matches]
 
-        // 1. Sidebar tab filter
+        // Sidebar Categories
         if (activeSidebar === "Short Listed By You") {
-            list = list.filter((m) => shortlistedIds.has(m.id))
-            if (list.length === 0 && shortlistedProfilesList.length > 0) {
-                list = shortlistedProfilesList
-            }
+            list = shortlistedProfilesList
         } else if (activeSidebar === "Viewed you") {
             list = whoViewedYouList
         } else if (activeSidebar === "Newly Joined") {
@@ -382,33 +214,44 @@ export default function BrowseMatchScreen() {
             }
         }
 
-        // 2. Quick filter chips
+        // Top Filter Chips
         if (activeFilter === "Profiles with photo") {
-            list = list.filter((m) => m.hasPhoto)
+            list = list.filter((m) => m.hasPhoto && !m.isPhotoHidden)
         } else if (activeFilter === "Newly Joined") {
             const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
             list = list.filter((m) => !m.createdAt || m.createdAt >= thirtyDaysAgo)
-        } else if (activeFilter === "Same City") {
+        } else if (activeFilter === "Mutual Matches") {
+            list = list.filter((m) => interestStatuses[String(m.id)] === "accepted")
+        } else if (activeFilter === "Locations") {
             const myCity = (myProfile?.location?.city || "").toLowerCase().trim()
             if (myCity) {
                 list = list.filter((m) => (m.location || "").toLowerCase().includes(myCity))
             }
-        } else if (activeFilter === "Verified") {
-            list = list.filter((m) => m.isVerified)
         }
 
-        // 3. Live search query
+        // Search query
         if (searchQuery.trim()) {
             const q = searchQuery.toLowerCase().trim()
-            list = list.filter((m) => {
-                return (
-                    m.name.toLowerCase().includes(q) ||
-                    m.location.toLowerCase().includes(q) ||
-                    m.occupation.toLowerCase().includes(q) ||
-                    m.education.toLowerCase().includes(q) ||
-                    m.tags.some((t) => t.toLowerCase().includes(q))
-                )
-            })
+            list = list.filter((m) => (
+                m.name.toLowerCase().includes(q) ||
+                m.location.toLowerCase().includes(q) ||
+                m.occupation.toLowerCase().includes(q) ||
+                m.education.toLowerCase().includes(q)
+            ))
+        }
+
+        // Exclude dismissed cards
+        list = list.filter((m) => !dismissedIds.has(String(m.id)))
+
+        // Sorting
+        if (sortBy === "compatibility") {
+            list.sort((a, b) => b.match - a.match)
+        } else if (sortBy === "recent") {
+            list.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+        } else if (sortBy === "age_asc") {
+            list.sort((a, b) => (a.age || 99) - (b.age || 99))
+        } else if (sortBy === "age_desc") {
+            list.sort((a, b) => (b.age || 0) - (a.age || 0))
         }
 
         return list
@@ -416,152 +259,274 @@ export default function BrowseMatchScreen() {
         matches,
         activeSidebar,
         activeFilter,
+        sortBy,
         searchQuery,
-        shortlistedIds,
+        dismissedIds,
         shortlistedProfilesList,
         whoViewedYouList,
+        interestStatuses,
         myProfile,
     ])
-
-    const PAGE_SIZE = 4
-    const loadMoreMatches = () => {
-        setVisibleCount((prev) => Math.min(prev + PAGE_SIZE, filteredMatches.length))
-    }
 
     return (
         <div className="min-h-screen bg-[#FBF9F9] font-sans flex flex-col">
             <Navbar />
-            <main className="flex-1 max-w-[1400px] w-full mx-auto px-4 sm:px-6 lg:px-10 py-6 sm:py-8">
+
+            {/* Confirm Interest Pop-up Modal */}
+            <ConfirmInterestModal
+                isOpen={isConfirmModalOpen}
+                onClose={() => setIsConfirmModalOpen(false)}
+                onConfirm={handleConfirmSendInterest}
+                profile={selectedMatchForInterest}
+                loading={sendingInterest}
+            />
+
+            <main className="flex-1 max-w-[1440px] w-full mx-auto px-4 sm:px-6 lg:px-10 py-6 sm:py-8">
                 {toastMessage && (
-                    <div className="mb-6 p-4 bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl text-sm font-medium animate-in fade-in">
+                    <div className="mb-6 p-4 bg-rose-50 border border-rose-200 text-rose-900 rounded-2xl text-xs sm:text-sm font-semibold shadow-xs">
                         {toastMessage}
                     </div>
                 )}
 
-                <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
-                    {/* Left Filter Sidebar */}
-                    <aside className="w-full lg:w-72 shrink-0 lg:sticky lg:top-24 lg:self-start">
-                        <div className="rounded-3xl bg-white p-4 border border-gray-100 shadow-xs space-y-1">
-                            <h2 className="px-3 pt-2 pb-3 font-serif font-bold text-lg text-[#640515]">
-                                Match Filters
-                            </h2>
-                            {sidebarLinks.map((l) => (
-                                <SidebarRow
-                                    key={l.label}
-                                    {...l}
-                                    active={activeSidebar === l.label}
-                                    onClick={() => {
-                                        setActiveSidebar(l.label)
-                                        setVisibleCount(6)
-                                    }}
-                                />
-                            ))}
+                <div className="flex flex-col lg:flex-row gap-8 lg:gap-10">
+                    {/* LEFT SIDEBAR NAVIGATION */}
+                    <aside className="w-full lg:w-80 shrink-0 space-y-6">
+                        <div className="bg-white rounded-3xl p-5 border border-gray-100 shadow-xs space-y-6">
+                            {/* Group 1: All Matches */}
+                            <div>
+                                <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 px-3 mb-2">
+                                    All Matches
+                                </h3>
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveSidebar("Your Matches")}
+                                    className={`w-full flex items-center justify-between p-3.5 rounded-2xl text-left transition-colors cursor-pointer ${
+                                        activeSidebar === "Your Matches"
+                                            ? "bg-[#FFF0F2] text-[#842029]"
+                                            : "hover:bg-gray-50 text-gray-700"
+                                    }`}
+                                >
+                                    <div>
+                                        <p className="text-sm font-bold">Your Matches</p>
+                                        <p className="text-[11px] text-gray-500 mt-0.5">
+                                            View All the profiles that match your preferences
+                                        </p>
+                                    </div>
+                                    <ChevronRight size={16} className={activeSidebar === "Your Matches" ? "text-[#842029]" : "text-gray-400"} />
+                                </button>
+                            </div>
+
+                            {/* Group 2: Based on activity */}
+                            <div>
+                                <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 px-3 mb-2">
+                                    Based on activity
+                                </h3>
+                                <div className="space-y-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => setActiveSidebar("Short Listed By You")}
+                                        className={`w-full flex items-center justify-between p-3.5 rounded-2xl text-left transition-colors cursor-pointer ${
+                                            activeSidebar === "Short Listed By You"
+                                                ? "bg-[#FFF0F2] text-[#842029]"
+                                                : "hover:bg-gray-50 text-gray-700"
+                                        }`}
+                                    >
+                                        <div>
+                                            <p className="text-sm font-bold">Short Listed By You</p>
+                                            <p className="text-[11px] text-gray-500 mt-0.5">
+                                                Matches you have shortlisted
+                                            </p>
+                                        </div>
+                                        <ChevronRight size={16} className={activeSidebar === "Short Listed By You" ? "text-[#842029]" : "text-gray-400"} />
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setActiveSidebar("Viewed you")}
+                                        className={`w-full flex items-center justify-between p-3.5 rounded-2xl text-left transition-colors cursor-pointer ${
+                                            activeSidebar === "Viewed you"
+                                                ? "bg-[#FFF0F2] text-[#842029]"
+                                                : "hover:bg-gray-50 text-gray-700"
+                                        }`}
+                                    >
+                                        <div>
+                                            <p className="text-sm font-bold">Viewed you</p>
+                                            <p className="text-[11px] text-gray-500 mt-0.5">
+                                                Matches who have viewed your profile
+                                            </p>
+                                        </div>
+                                        <ChevronRight size={16} className={activeSidebar === "Viewed you" ? "text-[#842029]" : "text-gray-400"} />
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Group 3: Recently Joined & Nearby Matches */}
+                            <div>
+                                <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 px-3 mb-2">
+                                    Recently Joined &amp; Nearby Matches
+                                </h3>
+                                <div className="space-y-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => setActiveSidebar("Newly Joined")}
+                                        className={`w-full flex items-center justify-between p-3.5 rounded-2xl text-left transition-colors cursor-pointer ${
+                                            activeSidebar === "Newly Joined"
+                                                ? "bg-[#FFF0F2] text-[#842029]"
+                                                : "hover:bg-gray-50 text-gray-700"
+                                        }`}
+                                    >
+                                        <div>
+                                            <p className="text-sm font-bold">Newly Joined</p>
+                                            <p className="text-[11px] text-gray-500 mt-0.5">
+                                                Matches who joined within the last 30 days
+                                            </p>
+                                        </div>
+                                        <ChevronRight size={16} className={activeSidebar === "Newly Joined" ? "text-[#842029]" : "text-gray-400"} />
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setActiveSidebar("Nearby Matches")}
+                                        className={`w-full flex items-center justify-between p-3.5 rounded-2xl text-left transition-colors cursor-pointer ${
+                                            activeSidebar === "Nearby Matches"
+                                                ? "bg-[#FFF0F2] text-[#842029]"
+                                                : "hover:bg-gray-50 text-gray-700"
+                                        }`}
+                                    >
+                                        <div>
+                                            <p className="text-sm font-bold">Nearby Matches</p>
+                                            <p className="text-[11px] text-gray-500 mt-0.5">
+                                                Matches near your location
+                                            </p>
+                                        </div>
+                                        <ChevronRight size={16} className={activeSidebar === "Nearby Matches" ? "text-[#842029]" : "text-gray-400"} />
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </aside>
 
-                    {/* Main Match List */}
-                    <div className="flex-1 min-w-0">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                            <div>
-                                <h1 className="font-serif font-bold text-2xl sm:text-3xl lg:text-4xl text-[#640515]">
-                                    {activeSidebar}
-                                </h1>
-                                <p className="text-gray-600 text-xs sm:text-sm mt-1">
-                                    {filteredMatches.length} {filteredMatches.length === 1 ? "profile" : "profiles"} found
-                                </p>
-                            </div>
-
-                            {/* Search bar */}
-                            <div className="relative max-w-xs w-full">
-                                <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                                <input
-                                    type="text"
-                                    placeholder="Search by city, name, job..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full pl-9 pr-4 py-2 rounded-full border border-gray-200 text-xs sm:text-sm bg-white focus:outline-none focus:border-[#842029]"
-                                />
-                            </div>
+                    {/* MAIN CONTENT AREA */}
+                    <div className="flex-1 min-w-0 space-y-6">
+                        {/* Page Header */}
+                        <div>
+                            <h1 className="font-serif text-3xl sm:text-4xl font-bold text-[#640515] leading-tight">
+                                Recommended Matches for You
+                            </h1>
+                            <p className="text-xs sm:text-sm text-gray-500 mt-1">
+                                Discover {filteredMatches.length} high-compatibility profiles based on your preferences.
+                            </p>
                         </div>
 
-                        {/* Quick filter chips */}
-                        <div className="mt-6 flex items-center gap-2 overflow-x-auto pb-2 [scrollbar-width:none]">
-                            {["All Matches", "Profiles with photo", "Newly Joined", "Same City", "Verified"].map(
-                                (chip) => (
+                        {/* Top Filter Chips & Bar */}
+                        <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 sm:p-4 rounded-3xl border border-gray-100 shadow-xs">
+                            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveFilter("All")}
+                                    className={`px-4 py-2 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                                        activeFilter === "All"
+                                            ? "bg-[#842029] text-white shadow-xs"
+                                            : "bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200"
+                                    }`}
+                                >
+                                    <Filter size={13} /> Filters
+                                </button>
+
+                                {/* Sort Dropdown */}
+                                <div className="relative inline-block">
+                                    <select
+                                        value={sortBy}
+                                        onChange={(e) => setSortBy(e.target.value)}
+                                        className="appearance-none bg-gray-50 border border-gray-200 text-gray-700 text-xs font-semibold py-2 pl-3 pr-8 rounded-full focus:outline-none focus:border-[#842029] cursor-pointer"
+                                    >
+                                        <option value="compatibility">Sort by: High Match</option>
+                                        <option value="recent">Sort by: Recent</option>
+                                        <option value="age_asc">Sort by: Age (Low to High)</option>
+                                        <option value="age_desc">Sort by: Age (High to Low)</option>
+                                    </select>
+                                    <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+                                </div>
+
+                                {/* Filter Chips */}
+                                {[
+                                    "Newly Joined",
+                                    "Profiles with photo",
+                                    "Mutual Matches",
+                                    "Locations",
+                                ].map((chip) => (
                                     <button
                                         key={chip}
                                         type="button"
-                                        onClick={() => {
-                                            setActiveFilter(chip)
-                                            setVisibleCount(6)
-                                        }}
-                                        className={`px-4 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all border cursor-pointer ${
+                                        onClick={() => setActiveFilter(activeFilter === chip ? "All" : chip)}
+                                        className={`px-3.5 py-2 rounded-full text-xs font-semibold transition-all cursor-pointer ${
                                             activeFilter === chip
-                                                ? "bg-[#842029] text-white border-[#842029]"
-                                                : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                                                ? "bg-[#842029] text-white shadow-xs"
+                                                : "bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200"
                                         }`}
                                     >
                                         {chip}
                                     </button>
-                                )
-                            )}
+                                ))}
+                            </div>
+
+                            {/* Live Search */}
+                            <div className="relative w-full sm:w-56">
+                                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Search by city, role..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="w-full bg-gray-50 border border-gray-200 rounded-full pl-8 pr-3 py-1.5 text-xs text-gray-700 focus:outline-none focus:border-[#842029]"
+                                />
+                            </div>
                         </div>
 
+                        {/* Match Cards List */}
                         {loading ? (
-                            <div className="py-20 text-center text-gray-500">Loading matches...</div>
+                            <div className="space-y-4 py-12 text-center text-gray-400">
+                                <div className="w-10 h-10 border-4 border-[#FFE4E8] border-t-[#842029] rounded-full animate-spin mx-auto mb-3" />
+                                <p className="text-sm">Finding compatible partner matches...</p>
+                            </div>
                         ) : filteredMatches.length === 0 ? (
-                            <div className="mt-8 bg-white rounded-3xl p-12 text-center border border-dashed border-gray-200">
-                                <p className="text-gray-500 text-sm">
-                                    No matches found for your current filter or search criteria. Try selecting "All Matches" or adjusting your partner preferences.
-                                </p>
-                                <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
-                                    <button
-                                        onClick={() => {
-                                            setActiveSidebar("Your Matches")
-                                            setActiveFilter("All Matches")
-                                            setSearchQuery("")
-                                        }}
-                                        className="px-5 py-2 rounded-full border border-gray-300 text-gray-700 text-xs font-semibold hover:bg-gray-50 cursor-pointer"
-                                    >
-                                        Reset Filters
-                                    </button>
-                                    <button
-                                        onClick={() => navigate("/profile")}
-                                        className="px-6 py-2 rounded-full bg-[#842029] text-white text-xs font-semibold hover:bg-[#6b1b27] cursor-pointer"
-                                    >
-                                        Adjust Partner Preferences
-                                    </button>
+                            <div className="bg-white rounded-3xl p-12 text-center border border-gray-100 shadow-xs space-y-3">
+                                <div className="w-14 h-14 rounded-full bg-rose-50 text-[#842029] flex items-center justify-center mx-auto">
+                                    <SlidersHorizontal size={24} />
                                 </div>
+                                <h3 className="font-serif text-xl font-bold text-gray-800">
+                                    No matches found for current filter
+                                </h3>
+                                <p className="text-xs text-gray-500 max-w-md mx-auto">
+                                    Try selecting a different filter tab, expanding your partner preferences, or clearing your search.
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setActiveFilter("All")
+                                        setActiveSidebar("Your Matches")
+                                        setSearchQuery("")
+                                        setDismissedIds(new Set())
+                                    }}
+                                    className="px-5 py-2.5 rounded-full bg-[#842029] text-white text-xs font-semibold hover:bg-[#6b1b27] transition-all cursor-pointer"
+                                >
+                                    Reset Filters
+                                </button>
                             </div>
                         ) : (
-                            <>
-                                <div className="mt-6 space-y-6">
-                                    {filteredMatches.slice(0, visibleCount).map((m) => (
-                                        <MatchCard
-                                            key={m.id}
-                                            {...m}
-                                            isShortlisted={shortlistedIds.has(m.id)}
-                                            interestStatus={interestStatuses[String(m.id)]}
-                                            onToggleShortlist={handleToggleShortlist}
-                                            onSendInterest={() => handleSendInterest(m.id)}
-                                            onViewProfile={() => navigate(`/match-details/${m.id}`)}
-                                            onNavigateChat={() => navigate(`/chat?profileId=${m.id}`)}
-                                            onNavigateReceived={() => navigate("/interests-received")}
-                                        />
-                                    ))}
-                                </div>
-
-                                {visibleCount < filteredMatches.length && (
-                                    <div className="flex justify-center mt-8 mb-6">
-                                        <button
-                                            onClick={loadMoreMatches}
-                                            className="px-8 py-3 rounded-full border-2 border-[#AE2539] text-[#AE2539] font-semibold text-xs sm:text-sm hover:bg-[#AE2539] hover:text-white transition-all shadow-xs cursor-pointer"
-                                        >
-                                            Load More Matches ({filteredMatches.length - visibleCount} remaining)
-                                        </button>
-                                    </div>
-                                )}
-                            </>
+                            <div className="space-y-5">
+                                {filteredMatches.map((m) => (
+                                    <MatchCard
+                                        key={m.id}
+                                        {...m}
+                                        interestStatus={interestStatuses[String(m.id)]}
+                                        onDismiss={handleDismissCard}
+                                        onSendInterest={handleOpenInterestModal}
+                                        onViewProfile={(pId) => navigate(`/match-details/${pId}`)}
+                                        onNavigateChat={(pId) => navigate(`/chat?profileId=${pId}`)}
+                                    />
+                                ))}
+                            </div>
                         )}
                     </div>
                 </div>

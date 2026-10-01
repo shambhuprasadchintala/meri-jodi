@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
-import { Search, Send, ArrowLeft, User, ShieldCheck, CheckCheck, Clock, Sparkles, RefreshCw, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react'
+import { Search, Send, ArrowLeft, User, ShieldCheck, CheckCheck, Clock, ExternalLink } from 'lucide-react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { io } from 'socket.io-client'
 import Navbar from '../Components/Navbar'
-import { getConversations, getConversationHistory, getChatSuggestions } from '../api/messageApi'
+import { getConversations, getConversationHistory } from '../api/messageApi'
 import { getProfileById } from '../api/matchingApi'
 import { getMyProfile } from '../api/profileApi'
+import { formatMaskedSurname } from '../utils/formatters'
 
 export default function Chatapp() {
   const navigate = useNavigate()
@@ -22,10 +23,6 @@ export default function Chatapp() {
   const [socket, setSocket] = useState(null)
   const [typingProfiles, setTypingProfiles] = useState({})
   const [myProfileId, setMyProfileId] = useState(null)
-  const [suggestions, setSuggestions] = useState([])
-  const [suggestionsLoading, setSuggestionsLoading] = useState(false)
-  const [activeCategory, setActiveCategory] = useState('icebreaker')
-  const [showAiBar, setShowAiBar] = useState(true)
   const messagesContainerRef = useRef(null)
   const typingTimeoutRef = useRef(null)
   const messageInputRef = useRef(null)
@@ -50,7 +47,6 @@ export default function Chatapp() {
           getMyProfile(),
         ])
         if (!cancelled) {
-          // Filter out null/invalid conversation objects
           const validConvos = Array.isArray(convos)
             ? convos.filter((c) => c && c._id && (c.partnerName || c.partner))
             : []
@@ -160,59 +156,6 @@ export default function Chatapp() {
     }
   }, [activeChat, socket])
 
-  // Fetch AI chat suggestions when activeProfile or category changes
-  const fetchAiSuggestions = async (cat = activeCategory) => {
-    if (!activeProfile) return
-    setSuggestionsLoading(true)
-    try {
-      const partnerDetails = {
-        name: activeProfile.name || activeProfile.userId?.name || 'Partner',
-        occupation: activeProfile.career?.occupation || '',
-        education: activeProfile.education?.highestDegree || '',
-        city: activeProfile.location?.city || '',
-        hobbies: activeProfile.hobbiesAndInterests || [],
-        religion: activeProfile.religion || '',
-        aboutMe: activeProfile.aboutMe || '',
-      }
-      const lastMsg = messages.length > 0 ? messages[messages.length - 1]?.content : ''
-      const res = await getChatSuggestions(partnerDetails, lastMsg, cat)
-      if (Array.isArray(res) && res.length > 0) {
-        setSuggestions(res)
-      } else {
-        setSuggestions([
-          `Hi ${partnerDetails.name.split(' ')[0]}! I noticed your profile and would love to connect.`,
-          `Hello! How has your week been going so far?`,
-          `Hi! I saw you are based in ${partnerDetails.city || 'India'}—what do you enjoy doing in your free time?`,
-          `Namaste! I really appreciated your profile and wanted to introduce myself.`,
-        ])
-      }
-    } catch (err) {
-      console.warn('Failed to load AI suggestions:', err)
-      const name = activeProfile.name || 'there'
-      setSuggestions([
-        `Hi ${name.split(' ')[0]}! I saw your profile and thought we would connect really well.`,
-        `Hello ${name.split(' ')[0]}! How are you doing today?`,
-        `Hi! I'd love to learn more about your passions and values.`,
-        `Namaste! Hope you're having a wonderful week!`,
-      ])
-    } finally {
-      setSuggestionsLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    if (activeProfile) {
-      fetchAiSuggestions(activeCategory)
-    }
-  }, [activeProfile, activeCategory])
-
-  const handleSelectSuggestion = (text) => {
-    setNewMessage(text)
-    if (messageInputRef.current) {
-      messageInputRef.current.focus()
-    }
-  }
-
   const handleSendMessage = (e) => {
     e.preventDefault()
     const content = newMessage.trim()
@@ -253,17 +196,19 @@ export default function Chatapp() {
 
   const filteredConversations = conversations.filter((conv) => {
     if (!conv || !conv._id) return false
-    const name = conv.partnerName || conv.partner?.name || conv.partner?.userId?.name || ''
-    return name.toLowerCase().includes(searchQuery.toLowerCase())
+    const rawName = conv.partnerName || conv.partner?.name || conv.partner?.userId?.name || ''
+    const masked = formatMaskedSurname(rawName)
+    return rawName.toLowerCase().includes(searchQuery.toLowerCase()) || masked.toLowerCase().includes(searchQuery.toLowerCase())
   })
 
   const getChatPartnerName = () => {
-    return activeProfile?.name || activeProfile?.userId?.name || 'Chat Partner'
+    const raw = activeProfile?.name || activeProfile?.userId?.name || 'Chat Partner'
+    return formatMaskedSurname(raw)
   }
 
   const getChatPartnerPhoto = () => {
     const p = activeProfile
-    if (!p) return null
+    if (!p || p.isPhotoHidden) return null
     const photos = p.photos || []
     const primary = photos.find((x) => typeof x === 'object' && x?.isPrimary)?.url
     const first = typeof photos[0] === 'object' ? photos[0]?.url : photos[0]
@@ -271,7 +216,7 @@ export default function Chatapp() {
   }
 
   const getConvPartnerPhoto = (conv) => {
-    if (!conv) return null
+    if (!conv || conv.isPhotoHidden || conv.partner?.isPhotoHidden) return null
     const photos = conv.partnerPhotos || conv.partner?.photos || []
     const primary = photos.find((x) => typeof x === 'object' && x?.isPrimary)?.url
     const first = typeof photos[0] === 'object' ? photos[0]?.url : photos[0]
@@ -290,13 +235,13 @@ export default function Chatapp() {
           >
             <div className="p-4 sm:p-5 border-b border-[#FFE4E8] shrink-0">
               <h1 className="text-lg sm:text-xl font-serif font-bold text-[#640515] mb-2 sm:mb-3">
-                Messages
+                Conversations
               </h1>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Search conversations..."
+                  placeholder="Search messages"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#842029]"
@@ -312,7 +257,8 @@ export default function Chatapp() {
               ) : (
                 filteredConversations.map((conv) => {
                   const partnerId = conv._id
-                  const partnerName = conv.partnerName || conv.partner?.name || conv.partner?.userId?.name || 'Member'
+                  const rawName = conv.partnerName || conv.partner?.name || conv.partner?.userId?.name || 'Member'
+                  const partnerName = formatMaskedSurname(rawName)
                   const partnerPhoto = getConvPartnerPhoto(conv)
                   const msg = conv.lastMessage
                   const isSelected = String(activeChat) === String(partnerId)
@@ -358,21 +304,29 @@ export default function Chatapp() {
             </div>
           </aside>
 
-          {/* Right Main Area: Active Chat */}
+          {/* Right Main Area: Active Chat or Figma Screenshot 1 Empty State */}
           <section
             className={`${!activeChat ? 'hidden md:flex' : 'flex'} flex-1 flex-col bg-white min-h-0 h-full overflow-hidden`}
           >
             {!activeChat ? (
-              <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-gray-50/50">
-                <div className="w-16 h-16 rounded-full bg-[#FFF0F2] text-[#842029] flex items-center justify-center mb-4">
-                  <User size={28} />
+              <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-white">
+                <div className="max-w-md mx-auto space-y-4">
+                  <h2 className="text-3xl sm:text-4xl font-serif font-bold text-[#640515] leading-tight">
+                    Your Eternal Connections
+                  </h2>
+                  <p className="text-xs sm:text-sm text-gray-600 leading-relaxed max-w-sm mx-auto">
+                    Select a conversation from the list to start chatting with your matches and discover the magic of a shared future.
+                  </p>
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={() => navigate("/browse-matches")}
+                      className="px-8 py-3 rounded-full bg-[#800020] hover:bg-[#6b1b27] text-white font-semibold text-xs sm:text-sm transition-all shadow-md cursor-pointer inline-flex items-center gap-2"
+                    >
+                      Browse Matches
+                    </button>
+                  </div>
                 </div>
-                <h2 className="text-xl sm:text-2xl font-serif font-bold text-[#640515] mb-2">
-                  Direct Messages
-                </h2>
-                <p className="text-xs sm:text-sm text-gray-500 max-w-sm">
-                  Select a match from the conversation list to start communicating securely in real time.
-                </p>
               </div>
             ) : (
               <div className="flex-1 flex flex-col min-h-0 h-full overflow-hidden">
@@ -403,39 +357,26 @@ export default function Chatapp() {
                         <h3 className="font-bold text-sm sm:text-base text-gray-900 font-serif truncate hover:text-[#842029] transition-colors">
                           {getChatPartnerName()}
                         </h3>
-                        {activeProfile?.isVerified && (
-                          <ShieldCheck size={14} className="text-emerald-600 shrink-0" />
-                        )}
                       </div>
                       {typingProfiles[activeChat] ? (
                         <p className="text-[11px] text-[#842029] font-medium animate-pulse">typing...</p>
                       ) : (
                         <p className="text-[11px] text-emerald-600 font-medium flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping inline-block" /> Online
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" /> Online
                         </p>
                       )}
                     </div>
                   </div>
 
-                  {/* Actions: View Profile & Toggle AI Bar */}
+                  {/* Actions: View Profile */}
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={() => navigate(`/match-details/${activeChat}`)}
-                      className="px-3 py-1.5 rounded-full border border-gray-200 text-gray-700 hover:border-[#842029] hover:text-[#842029] text-xs font-semibold hover:bg-[#FFF0F2] transition-colors cursor-pointer flex items-center gap-1"
+                      className="px-3.5 py-1.5 rounded-full border border-gray-200 text-gray-700 hover:border-[#842029] hover:text-[#842029] text-xs font-semibold hover:bg-[#FFF0F2] transition-colors cursor-pointer flex items-center gap-1"
                     >
                       <ExternalLink size={12} />
                       <span className="hidden sm:inline">View Profile</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowAiBar(!showAiBar)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#FFF0F2] text-[#842029] text-xs font-semibold hover:bg-[#FFE4E8] transition-colors cursor-pointer border border-[#FFE4E8]"
-                      title="Toggle AI Suggestions"
-                    >
-                      <Sparkles size={14} />
-                      <span className="hidden sm:inline">AI Suggestions</span>
-                      {showAiBar ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
                     </button>
                   </div>
                 </header>
@@ -451,7 +392,7 @@ export default function Chatapp() {
                         <Send size={20} />
                       </div>
                       <p className="text-xs font-medium text-gray-500">No messages yet.</p>
-                      <p className="text-[11px] text-gray-400 mt-0.5">Use the AI suggestions below or type a message to start chatting!</p>
+                      <p className="text-[11px] text-gray-400 mt-0.5">Send a warm greeting to start your conversation!</p>
                     </div>
                   ) : (
                     messages.map((msg) => {
@@ -481,73 +422,7 @@ export default function Chatapp() {
                   )}
                 </div>
 
-                {/* AI Chat Suggestion Bar */}
-                {showAiBar && activeProfile && (
-                  <div className="px-3 sm:px-4 py-2.5 bg-[#FFF9FA] border-t border-[#FFE4E8] shrink-0">
-                    <div className="flex items-center justify-between gap-2 mb-2">
-                      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]">
-                        <span className="text-[11px] font-bold text-[#842029] flex items-center gap-1 uppercase tracking-wider shrink-0 mr-1">
-                          <Sparkles size={13} /> AI Prompts:
-                        </span>
-                        {[
-                          { id: 'icebreaker', label: '✨ Icebreaker' },
-                          { id: 'shared_interests', label: '🌟 Passions' },
-                          { id: 'thoughtful', label: '💬 Meaningful' },
-                          { id: 'compliments', label: '❤️ Compliment' },
-                        ].map((cat) => (
-                          <button
-                            key={cat.id}
-                            type="button"
-                            onClick={() => {
-                              setActiveCategory(cat.id)
-                              fetchAiSuggestions(cat.id)
-                            }}
-                            className={`px-2.5 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap transition-all cursor-pointer ${
-                              activeCategory === cat.id
-                                ? 'bg-[#842029] text-white shadow-2xs'
-                                : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-                            }`}
-                          >
-                            {cat.label}
-                          </button>
-                        ))}
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => fetchAiSuggestions(activeCategory)}
-                        disabled={suggestionsLoading}
-                        className="p-1.5 rounded-full text-[#842029] hover:bg-rose-100 transition-colors shrink-0 cursor-pointer disabled:opacity-50"
-                        title="Generate New Suggestions"
-                      >
-                        <RefreshCw size={13} className={suggestionsLoading ? 'animate-spin' : ''} />
-                      </button>
-                    </div>
-
-                    {/* Suggestion Chips */}
-                    <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
-                      {suggestionsLoading ? (
-                        <div className="flex items-center gap-2 py-1 text-xs text-gray-400 animate-pulse">
-                          <Sparkles size={13} className="text-[#842029]" /> Generating smart suggestions...
-                        </div>
-                      ) : (
-                        suggestions.map((text, idx) => (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() => handleSelectSuggestion(text)}
-                            className="bg-white border border-rose-200 hover:border-[#842029] hover:bg-[#FFF0F2] text-gray-700 hover:text-[#842029] text-xs px-3 py-1.5 rounded-xl whitespace-nowrap transition-all shadow-2xs cursor-pointer max-w-[280px] truncate shrink-0 text-left"
-                            title={text}
-                          >
-                            &ldquo;{text}&rdquo;
-                          </button>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Fixed Bottom Chat Input Bar */}
+                {/* Bottom Chat Input Bar */}
                 <form
                   onSubmit={handleSendMessage}
                   className="p-3 sm:p-4 border-t border-gray-100 bg-white flex items-center gap-2 sm:gap-3 shrink-0"
@@ -558,18 +433,17 @@ export default function Chatapp() {
                     value={newMessage}
                     onChange={(e) => {
                       setNewMessage(e.target.value)
-                      handleTyping(true)
+                      handleTyping(e.target.value.length > 0)
                     }}
-                    onBlur={() => handleTyping(false)}
-                    placeholder="Type your message or click an AI suggestion..."
-                    className="flex-1 px-4 py-2.5 rounded-full bg-gray-50 border border-gray-200 focus:bg-white focus:border-[#842029] text-xs sm:text-sm outline-none transition-all"
+                    placeholder="Type a message..."
+                    className="flex-1 bg-gray-50 border border-gray-200 rounded-full px-4 py-2.5 text-xs sm:text-sm focus:outline-none focus:border-[#842029] focus:bg-white transition-colors"
                   />
                   <button
                     type="submit"
                     disabled={!newMessage.trim()}
-                    className="w-10 h-10 rounded-full flex items-center justify-center text-white bg-[#842029] hover:bg-[#6b1b27] disabled:opacity-40 transition-colors shadow-xs shrink-0 cursor-pointer"
+                    className="w-10 h-10 rounded-full bg-[#842029] text-white flex items-center justify-center shrink-0 hover:bg-[#6b1b27] disabled:opacity-40 transition-all shadow-xs cursor-pointer"
                   >
-                    <Send className="w-4 h-4" />
+                    <Send size={16} />
                   </button>
                 </form>
               </div>

@@ -43,6 +43,18 @@ class ProfileController extends BaseController {
         }
     }
 
+    async getProfileByUserId(req, res, next) {
+        try {
+            const profile = await profileService.getByUserId(req.params.userId)
+            if (!profile) {
+                return this.sendError(res, "Profile not found", 404)
+            }
+            return this.sendSuccess(res, profile, "Profile retrieved")
+        } catch (error) {
+            next(error)
+        }
+    }
+
     async getWhoViewedMe(req, res, next) {
         try {
             const limit = parseInt(req.query.limit) || 10

@@ -88,8 +88,26 @@ class MatchingService {
             if (preferences.maritalStatus && preferences.maritalStatus.length > 0) {
                 query.maritalStatus = { $in: preferences.maritalStatus }
             }
-            if (preferences.location) {
-                query["location.city"] = preferences.location
+            if (preferences.locations && preferences.locations.length > 0) {
+                const locRegexes = preferences.locations
+                    .map((l) => (typeof l === "string" ? l.trim() : ""))
+                    .filter(Boolean)
+                    .map((l) => new RegExp(l.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"))
+                if (locRegexes.length > 0) {
+                    query.$or = [
+                        { "location.city": { $in: locRegexes } },
+                        { "location.state": { $in: locRegexes } },
+                    ]
+                }
+            } else if (preferences.location) {
+                const locs = preferences.location.split(",").map((l) => l.trim()).filter(Boolean)
+                if (locs.length > 0) {
+                    const locRegexes = locs.map((l) => new RegExp(l.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"))
+                    query.$or = [
+                        { "location.city": { $in: locRegexes } },
+                        { "location.state": { $in: locRegexes } },
+                    ]
+                }
             }
 
             // Age filter
@@ -172,6 +190,8 @@ class MatchingService {
             ...match,
             name: match.name || match.userId?.name || "MeriJodi Member",
             age: calculateAge(match.dateOfBirth),
+            isPhotoHidden: !!match.isPhotoHidden,
+            photos: match.isPhotoHidden ? [] : match.photos,
             compatibilityScore: this._calculateCompatibility(
                 profile,
                 { ...match, age: calculateAge(match.dateOfBirth) },
@@ -179,8 +199,16 @@ class MatchingService {
             ),
         }))
 
-        // Sort by compatibility score (descending)
-        candidatesWithScore.sort((a, b) => b.compatibilityScore - a.compatibilityScore)
+        // Sort by option or compatibility score (descending)
+        if (options.sort === "recent" || options.sort === "newly_joined") {
+            candidatesWithScore.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+        } else if (options.sort === "age_asc") {
+            candidatesWithScore.sort((a, b) => (a.age || 99) - (b.age || 99))
+        } else if (options.sort === "age_desc") {
+            candidatesWithScore.sort((a, b) => (b.age || 0) - (a.age || 0))
+        } else {
+            candidatesWithScore.sort((a, b) => b.compatibilityScore - a.compatibilityScore)
+        }
 
         // Paginate after sorting
         const matches = candidatesWithScore.slice(skip, skip + limit)
@@ -234,11 +262,23 @@ class MatchingService {
 
         // Location match (15 points)
         maxScore += 15
-        if (preferences?.location && matchProfile.location?.city) {
-            if (preferences.location.toLowerCase() === matchProfile.location.city.toLowerCase()) {
+        const candidateCity = (matchProfile.location?.city || "").toLowerCase()
+        const candidateState = (matchProfile.location?.state || "").toLowerCase()
+        const prefLocations = [
+            ...(preferences?.locations || []),
+            ...(preferences?.location ? preferences.location.split(",") : []),
+        ].map((l) => (typeof l === "string" ? l.trim().toLowerCase() : "")).filter(Boolean)
+
+        if (prefLocations.length > 0) {
+            const matchesLocation = prefLocations.some(
+                (loc) => candidateCity.includes(loc) || loc.includes(candidateCity) || candidateState.includes(loc) || loc.includes(candidateState)
+            )
+            if (matchesLocation) {
                 score += 15
+            } else {
+                score += 5
             }
-        } else if (userProfile.location?.city && matchProfile.location?.city && userProfile.location.city.toLowerCase() === matchProfile.location.city.toLowerCase()) {
+        } else if (userProfile.location?.city && candidateCity && (userProfile.location.city.toLowerCase() === candidateCity || candidateCity.includes(userProfile.location.city.toLowerCase()))) {
             score += 12
         } else {
             score += 7.5

@@ -28,8 +28,10 @@ import {
     Target,
     ArrowRight,
     Camera,
-    CheckCircle,
+    Eye,
+    EyeOff,
 } from "lucide-react"
+import { formatMaskedSurname } from "../utils/formatters"
 
 const calculateAge = (dateOfBirth) => {
     if (!dateOfBirth) return null
@@ -143,7 +145,7 @@ const PreferenceField = ({ label, value, onEdit }) => (
     </div>
 )
 
-export default function MyProfile() {
+function MyProfile() {
     const navigate = useNavigate()
     const { user, updateUser } = useAuth()
     const [profile, setProfile] = useState(null)
@@ -320,9 +322,9 @@ export default function MyProfile() {
                             >
                                 <Camera size={14} /> Manage Photos ({photosList.length}/6)
                             </button>
-                            {profile.isVerified && (
-                                <span className="absolute top-3 left-3 px-3 py-1 rounded-full bg-emerald-600 text-white text-[11px] font-bold shadow-md flex items-center gap-1">
-                                    <CheckCircle size={12} /> Verified Profile
+                            {profile.isPhotoHidden && (
+                                <span className="absolute top-3 left-3 px-3 py-1 rounded-full bg-amber-600/90 backdrop-blur-xs text-white text-[11px] font-bold shadow-md flex items-center gap-1">
+                                    <EyeOff size={12} /> Photo Hidden from Members
                                 </span>
                             )}
                         </div>
@@ -365,7 +367,7 @@ export default function MyProfile() {
                             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-3 text-xs sm:text-sm text-gray-600">
                                 <div className="flex items-center gap-1 font-medium">
                                     <Calendar size={15} className="text-[#842029]" />
-                                    <span>{calculateAge(profile.dateOfBirth) ?? "—"} Years</span>
+                                    <span>Age: {calculateAge(profile.dateOfBirth) ?? "—"}</span>
                                 </div>
                                 <span>&bull;</span>
                                 <div className="flex items-center gap-1 font-medium">
@@ -395,7 +397,7 @@ export default function MyProfile() {
                                     onClick={() => setEditingSection("about")}
                                     className="text-xs font-semibold text-[#842029] hover:underline cursor-pointer flex items-center gap-1"
                                 >
-                                    ✎ Edit Bio / AI
+                                    ✎ Edit Bio
                                 </button>
                             </div>
                             <p className="text-xs sm:text-sm text-gray-700 leading-relaxed">
@@ -680,6 +682,7 @@ export default function MyProfile() {
                                 const mId = match._id || match.id
                                 const mPhoto = match.photos?.find((p) => p.isPrimary)?.url || match.photos?.[0]?.url || home1
                                 const mName = match.name || match.userId?.name || "Member"
+                                const maskedName = formatMaskedSurname(mName)
                                 const mAge = calculateAge(match.dateOfBirth)
                                 return (
                                     <div
@@ -697,7 +700,7 @@ export default function MyProfile() {
                                         </div>
                                         <div className="p-4">
                                             <h3 className="font-bold text-gray-900 text-base font-serif">
-                                                {mName}{mAge ? `, ${mAge}` : ""}
+                                                {maskedName}{mAge ? `, ${mAge}` : ""}
                                             </h3>
                                             <p className="text-xs text-gray-500 mt-1">
                                                 {match.career?.occupation || "Professional"} &bull; {match.location?.city || "India"}
@@ -732,9 +735,12 @@ export default function MyProfile() {
             <PhotoUploadModal
                 isOpen={isPhotoModalOpen}
                 photos={photosList}
+                isPhotoHidden={profile?.isPhotoHidden}
                 onClose={() => setIsPhotoModalOpen(false)}
                 onPhotosUpdated={handlePhotosUpdated}
             />
         </div>
     )
 }
+
+export default MyProfile

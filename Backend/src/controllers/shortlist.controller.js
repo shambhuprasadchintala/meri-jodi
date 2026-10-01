@@ -5,9 +5,9 @@ import profileService from "../services/profile.service.js"
 class ShortlistController extends BaseController {
     async toggleShortlist(req, res, next) {
         try {
-            const profile = await profileService.getByUserId(req.user._id)
+            let profile = await profileService.getByUserId(req.user._id)
             if (!profile) {
-                return this.sendError(res, "Profile not found", 404)
+                profile = await profileService.create(req.user._id, { name: req.user.name })
             }
 
             const targetId = req.body.profileId || req.body.targetProfileId || req.body.shortlistedProfileId
@@ -35,7 +35,7 @@ class ShortlistController extends BaseController {
         try {
             const profile = await profileService.getByUserId(req.user._id)
             if (!profile) {
-                return this.sendError(res, "Profile not found", 404)
+                return this.sendSuccess(res, [], "Shortlisted profiles retrieved")
             }
 
             const shortlisted = await shortlistService.getShortlisted(

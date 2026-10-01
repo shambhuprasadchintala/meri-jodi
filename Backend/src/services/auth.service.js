@@ -371,7 +371,7 @@ class AuthService {
         user.lastLogin = new Date()
         await user.save()
 
-        const { accessToken, refreshToken } = await generateToken(user._id, res)
+        const { accessToken, refreshToken } = await generateToken(user._id, res, "7d")
         await redisClient.setEx(`user:${user._id}`, 3600, JSON.stringify(user.toAuthJSON()))
 
         return {
@@ -819,14 +819,14 @@ class AuthService {
 
     /**
      * Forgot Password:
-     * Generates a secure reset token, stores in Redis (15 min TTL), and sends reset link email.
+     * Generates a secure reset token and 6-digit OTP, stores in Redis (15 min TTL), and sends reset link email.
      */
     async forgotPassword({ email, reqIp = "127.0.0.1" }) {
         const cleanEmail = email.toLowerCase().trim()
 
         const rateLimitKey = `forgot-password-rate:${reqIp}:${cleanEmail}`
         if (await redisClient.get(rateLimitKey)) {
-            const error = new Error("Please wait before requesting another password reset.")
+            const error = new Error("Please wait a few seconds before requesting another password reset.")
             error.statusCode = 429
             throw error
         }
@@ -839,27 +839,45 @@ class AuthService {
         }
 
         const resetToken = crypto.randomBytes(32).toString("hex")
+        const resetOtp = Math.floor(100000 + Math.random() * 900000).toString()
         const resetKey = `password-reset:${resetToken}`
+        const otpKey = `password-reset-otp:${resetOtp}`
 
         await redisClient.set(resetKey, JSON.stringify({ userId: user._id.toString(), email: cleanEmail }), { EX: 900 })
+        await redisClient.set(otpKey, resetToken, { EX: 900 })
 
-        const html = getResetPasswordHtml({ email: cleanEmail, token: resetToken, appName: config.appName })
-        await sendMail({ email: cleanEmail, subject: `${config.appName} - Reset Your Password`, html })
+        const baseUrl = config.frontendUrl || config.frontendDomain || "http://localhost:5173"
+        const resetUrl = `${baseUrl.replace(/\/+$/, "")}/reset-password/${encodeURIComponent(resetToken)}`
+        const subject = `${config.appName} Password Reset Code: ${resetOtp}`
+        const text = `Your password reset code is: ${resetOtp}\nOr click this link to reset your password: ${resetUrl}`
 
-        await redisClient.set(rateLimitKey, "true", { EX: 60 })
+        const html = getResetPasswordHtml({
+            email: cleanEmail,
+            token: resetToken,
+            otp: resetOtp,
+            appName: config.appName,
+        })
+        const mailResult = await sendMail({ email: cleanEmail, subject, html, text })
 
+        await redisClient.set(rateLimitKey, "true", { EX: 5 })
+
+        const isDev = config.env !== "production"
         return {
             message: "If an account with this email exists, a password reset link has been sent.",
+            devResetUrl: isDev ? resetUrl : undefined,
+            devToken: isDev ? resetToken : undefined,
+            devOtp: isDev ? resetOtp : undefined,
+            sentTo: cleanEmail,
         }
     }
 
     /**
      * Reset Password:
-     * Validates the reset token from Redis and updates the user's password.
+     * Validates the reset token or 6-digit OTP code from Redis and updates the user's password.
      */
     async resetPassword({ token, newPassword }) {
         if (!token || !newPassword) {
-            const error = new Error("Reset token and new password are required.")
+            const error = new Error("Reset token (or code) and new password are required.")
             error.statusCode = 400
             throw error
         }
@@ -870,11 +888,22 @@ class AuthService {
             throw error
         }
 
-        const resetKey = `password-reset:${token}`
+        const input = String(token).trim()
+        let resolvedToken = input
+
+        // If input is a 6-digit OTP code, resolve token from redis
+        if (/^\d{6}$/.test(input)) {
+            const mappedToken = await redisClient.get(`password-reset-otp:${input}`)
+            if (mappedToken) {
+                resolvedToken = mappedToken
+            }
+        }
+
+        const resetKey = `password-reset:${resolvedToken}`
         const dataJson = await redisClient.get(resetKey)
 
         if (!dataJson) {
-            const error = new Error("Password reset link has expired or is invalid.")
+            const error = new Error("Password reset link or code has expired or is invalid.")
             error.statusCode = 400
             throw error
         }

@@ -6,11 +6,11 @@ import profileService from "../services/profile.service.js"
 class InterestController extends BaseController {
     async sendInterest(req, res, next) {
         try {
-            const senderProfile = await profileService.getByUserId(
+            let senderProfile = await profileService.getByUserId(
                 req.user._id
             )
             if (!senderProfile) {
-                return this.sendError(res, "Profile not found", 404)
+                senderProfile = await profileService.create(req.user._id, { name: req.user.name })
             }
 
             const { interest, isMutual } = await interestService.send(
@@ -179,7 +179,7 @@ class InterestController extends BaseController {
         try {
             const profile = await profileService.getByUserId(req.user._id)
             if (!profile) {
-                return this.sendError(res, "Profile not found", 404)
+                return this.sendSuccess(res, [], "Sent interests retrieved")
             }
 
             const interests = await interestService.getSent(
@@ -199,7 +199,7 @@ class InterestController extends BaseController {
         try {
             const profile = await profileService.getByUserId(req.user._id)
             if (!profile) {
-                return this.sendError(res, "Profile not found", 404)
+                return this.sendSuccess(res, [], "Received interests retrieved")
             }
 
             const interests = await interestService.getReceived(

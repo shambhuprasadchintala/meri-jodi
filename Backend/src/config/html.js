@@ -110,7 +110,7 @@ export const getVerifyEmailHtml = ({ email, token, otp, appName = "MeriJodi" }) 
 </html>`
 }
 
-export const getResetPasswordHtml = ({ email, token, appName = "MeriJodi" }) => {
+export const getResetPasswordHtml = ({ email, token, otp, appName = "MeriJodi" }) => {
     const baseUrl = config.frontendUrl || config.frontendDomain || "http://localhost:5173"
     const resetUrl = `${baseUrl.replace(/\/+$/, "")}/reset-password/${encodeURIComponent(token)}`
 
@@ -129,8 +129,10 @@ export const getResetPasswordHtml = ({ email, token, appName = "MeriJodi" }) => 
   .tagline { font-size: 13px; color: #FFE4E6; margin-top: 4px; }
   .content { padding: 36px 32px; text-align: center; }
   .title { font-size: 22px; font-weight: 700; color: #111827; margin: 0 0 12px 0; }
-  .subtitle { font-size: 15px; line-height: 1.6; color: #4B5563; margin: 0 0 28px 0; }
-  .btn { display: inline-block; background: #ED5463; color: #FFFFFF !important; text-decoration: none; padding: 14px 32px; border-radius: 50px; font-weight: 700; font-size: 16px; box-shadow: 0 4px 12px rgba(237, 84, 99, 0.3); }
+  .subtitle { font-size: 15px; line-height: 1.6; color: #4B5563; margin: 0 0 24px 0; }
+  .otp-box { background: #FFF1F2; border: 2px dashed #FDA4AF; border-radius: 12px; padding: 16px 24px; display: inline-block; margin: 0 auto 24px auto; }
+  .otp { font-size: 36px; font-weight: 800; letter-spacing: 8px; color: #E11D48; font-family: 'Courier New', monospace; }
+  .btn { display: inline-block; background: #ED5463; color: #FFFFFF !important; text-decoration: none; padding: 14px 32px; border-radius: 50px; font-weight: 700; font-size: 16px; box-shadow: 0 4px 12px rgba(237, 84, 99, 0.3); margin-top: 8px; }
   .note { font-size: 13px; color: #9CA3AF; line-height: 1.6; margin-top: 24px; }
   .link-box { word-break: break-all; color: #ED5463; font-size: 12px; margin-top: 12px; }
   .footer { background: #FAFAFA; padding: 20px; text-align: center; border-top: 1px solid #F3F4F6; font-size: 12px; color: #9CA3AF; }
@@ -145,11 +147,19 @@ export const getResetPasswordHtml = ({ email, token, appName = "MeriJodi" }) => 
     </div>
     <div class="content">
       <h2 class="title">Reset Your Password</h2>
-      <p class="subtitle">We received a request to reset the password for your <strong>${appName}</strong> account (<strong>${email}</strong>). Click the button below to choose a new password.</p>
+      <p class="subtitle">We received a request to reset the password for your <strong>${appName}</strong> account (<strong>${email}</strong>). Use the 6-digit code or click below to choose a new password.</p>
+      ${
+        otp
+          ? `<div class="otp-box">
+        <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #9B1C1C; margin-bottom: 6px; font-weight: 700;">Password Reset Code</div>
+        <div class="otp">${otp}</div>
+      </div>`
+          : ""
+      }
       <div>
         <a class="btn" href="${resetUrl}" target="_blank" rel="noopener">Reset My Password</a>
       </div>
-      <p class="note">This password reset link is valid for <strong>15 minutes</strong>.</p>
+      <p class="note">This password reset link and code are valid for <strong>15 minutes</strong>.</p>
       <p class="note">If you did not request a password reset, you can safely ignore this email.</p>
       <div class="link-box"><a href="${resetUrl}" style="color: #ED5463;">${resetUrl}</a></div>
     </div>

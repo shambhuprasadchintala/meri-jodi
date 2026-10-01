@@ -11,6 +11,12 @@ router.use(attachUser)
 
 router.get("/sent", interestController.getSentInterests.bind(interestController))
 router.get("/received", interestController.getReceivedInterests.bind(interestController))
+router.get("/", (req, res, next) => {
+    if (req.query.type === "sent") {
+        return interestController.getSentInterests(req, res, next)
+    }
+    return interestController.getReceivedInterests(req, res, next)
+})
 router.post("/", sendInterest, validate, interestController.sendInterest.bind(interestController))
 router.put("/:id/accept", validateObjectId("id"), validate, interestController.acceptInterest.bind(interestController))
 router.put("/:id/decline", validateObjectId("id"), validate, interestController.declineInterest.bind(interestController))

@@ -26,6 +26,8 @@ import { getProfileById } from "../api/matchingApi"
 import { sendInterest, getSentInterests, getReceivedInterests } from "../api/interestApi"
 import { toggleShortlist, getShortlistedProfiles } from "../api/shortlistApi"
 
+import { formatMaskedSurname } from "../utils/formatters"
+
 const calculateAge = (dateOfBirth) => {
     if (!dateOfBirth) return null
     const dob = new Date(dateOfBirth)
@@ -193,7 +195,7 @@ export default function DetailsPage_BrowsematchScreen() {
         if (navigator.share) {
             try {
                 await navigator.share({
-                    title: `${profile?.name || "Member"} on MeriJodi`,
+                    title: `${profile?.name ? formatMaskedSurname(profile.name) : "Member"} on MeriJodi`,
                     text: `Check out this verified matrimonial profile on MeriJodi`,
                     url: shareUrl,
                 })
@@ -251,9 +253,11 @@ export default function DetailsPage_BrowsematchScreen() {
         )
     }
 
-    const name = profile.name || profile.userId?.name || "MeriJodi Member"
+    const rawName = profile.name || profile.userId?.name || "MeriJodi Member"
+    const maskedName = formatMaskedSurname(rawName)
     const age = calculateAge(profile.dateOfBirth)
-    const displayName = age ? `${name}, ${age}` : name
+    const displayName = age ? `${maskedName}, Age: ${age}` : maskedName
+    const isPhotoHidden = !!profile.isPhotoHidden
     const getPhotoUrl = (p) => (typeof p === "string" ? p : p?.url)
     const primaryPhoto = profile.photos?.find((p) => typeof p === "object" && p?.isPrimary)
     const fallbackPhoto = profile.gender === "female" ? ProfileImage : userImage
@@ -267,6 +271,26 @@ export default function DetailsPage_BrowsematchScreen() {
     return (
         <div className="min-h-screen bg-[#FBF9F9] flex flex-col font-sans">
             <Navbar />
+
+            {/* Confirm Interest Modal */}
+            <ConfirmInterestModal
+                isOpen={showInterestModal}
+                onClose={() => setShowInterestModal(false)}
+                onConfirm={handleSendInterest}
+                profile={profile}
+                profileName={maskedName}
+                profileImage={isPhotoHidden ? fallbackPhoto : photoUrl}
+                gender={profile.gender}
+            />
+
+            {/* Block / Report Modal */}
+            <BlockReportModal
+                isOpen={showBlockReportModal}
+                onClose={() => setShowBlockReportModal(false)}
+                targetProfile={profile}
+                onActionSuccess={handleBlockReportSuccess}
+            />
+
             <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-10 py-6 sm:py-8">
                 {/* Back Button */}
                 <div className="flex items-center justify-between mb-6">
@@ -288,15 +312,25 @@ export default function DetailsPage_BrowsematchScreen() {
                     {/* Left Column (5 Cols) - Hero Photo & Compatibility */}
                     <div className="lg:col-span-5 space-y-4">
                         <div className="relative aspect-4/5 w-full rounded-3xl overflow-hidden shadow-md bg-gray-100">
-                            <img
-                                src={photoUrl}
-                                alt={name}
-                                className="w-full h-full object-cover"
-                                onError={(e) => {
-                                    e.currentTarget.onerror = null
-                                    e.currentTarget.src = fallbackPhoto
-                                }}
-                            />
+                            {isPhotoHidden ? (
+                                <div className="w-full h-full bg-gradient-to-br from-rose-50 to-pink-100 flex flex-col items-center justify-center p-6 text-center">
+                                    <div className="w-16 h-16 rounded-full bg-white/80 flex items-center justify-center text-[#842029] mb-3 shadow-sm">
+                                        <Heart size={28} />
+                                    </div>
+                                    <span className="text-base font-bold text-[#842029]">Photo Hidden by Member</span>
+                                    <span className="text-xs text-gray-500 mt-1">This member has enabled photo privacy</span>
+                                </div>
+                            ) : (
+                                <img
+                                    src={photoUrl}
+                                    alt={displayName}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                        e.currentTarget.onerror = null
+                                        e.currentTarget.src = fallbackPhoto
+                                    }}
+                                />
+                            )}
                             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-6 text-white">
                                 <h1 className="text-3xl sm:text-4xl font-bold font-serif leading-tight">
                                     {displayName}
@@ -309,7 +343,7 @@ export default function DetailsPage_BrowsematchScreen() {
                         </div>
 
                         {/* Extra Photos Thumbnails */}
-                        {profile.photos?.length > 1 && (
+                        {!isPhotoHidden && profile.photos?.length > 1 && (
                             <div className="flex gap-2 overflow-x-auto pb-1">
                                 {profile.photos.map((p, i) => (
                                     <img

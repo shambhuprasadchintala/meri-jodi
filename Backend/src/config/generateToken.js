@@ -2,13 +2,13 @@ import jwt from "jsonwebtoken"
 import { config } from "./config.js"
 import { redisClient } from "./redis.js"
 
-export const generateToken = async (userId, res = null) => {
+export const generateToken = async (userId, res = null, customAccessExpiry = "15m") => {
     const idStr = userId.toString()
 
     const accessToken = jwt.sign(
         { userId: idStr, id: idStr },
         config.jwtSecret,
-        { expiresIn: "15m" }
+        { expiresIn: customAccessExpiry }
     )
 
     const refreshToken = jwt.sign(

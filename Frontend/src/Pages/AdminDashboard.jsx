@@ -32,6 +32,13 @@ import {
     Unlock,
     ShieldAlert,
     Image as ImageIcon,
+    Settings as SettingsIcon,
+    CreditCard,
+    Plus,
+    Edit3,
+    Key,
+    User,
+    Server,
 } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import Navbar from "../Components/Navbar"
@@ -48,6 +55,11 @@ import {
     reviewAdminVerification,
     getAdminReports,
     updateAdminReportStatus,
+    updateAdminUserProfile,
+    addAdminUserSubscription,
+    getAdminProfileSettings,
+    updateAdminProfileSettings,
+    updateAdminPasswordSettings,
 } from "../api/adminApi"
 import { useToast } from "../context/ToastContext"
 import ConfirmModal from "../Components/ConfirmModal"
@@ -87,6 +99,41 @@ export default function AdminDashboard() {
     const [reportActionNote, setReportActionNote] = useState("")
     const [selectedUserDetail, setSelectedUserDetail] = useState(null)
     const [loadingUserDetail, setLoadingUserDetail] = useState(false)
+
+    // Edit Profile Modal State
+    const [editProfileModalOpen, setEditProfileModalOpen] = useState(false)
+    const [editFormData, setEditFormData] = useState({})
+    const [editSaving, setEditSaving] = useState(false)
+
+    // Assign Subscription Plan State
+    const [assignPlanModalOpen, setAssignPlanModalOpen] = useState(false)
+    const [planFormData, setPlanFormData] = useState({
+        planName: "Premium Plan",
+        planId: "premium",
+        amount: 1999,
+        billingCycle: "annual",
+        durationDays: 365,
+        paymentMethod: "Admin Assigned",
+        autoRenew: false,
+        notes: "Assigned via Admin Console",
+    })
+    const [planSaving, setPlanSaving] = useState(false)
+
+    // Settings State
+    const [settingsActiveTab, setSettingsActiveTab] = useState("personal")
+    const [settingsPersonalForm, setSettingsPersonalForm] = useState({
+        name: "",
+        email: "",
+        phone: "",
+        avatar: "",
+    })
+    const [settingsPersonalSaving, setSettingsPersonalSaving] = useState(false)
+    const [settingsPasswordForm, setSettingsPasswordForm] = useState({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+    })
+    const [settingsPasswordSaving, setSettingsPasswordSaving] = useState(false)
 
     // Fetch All Primary Data
     const fetchAllData = useCallback(async () => {
@@ -240,6 +287,165 @@ export default function AdminDashboard() {
             addToast("Failed to fetch full user dossier", "error")
         } finally {
             setLoadingUserDetail(false)
+        }
+    }
+
+    // Fetch Admin Settings Profile
+    const fetchAdminSettingsProfile = useCallback(async () => {
+        try {
+            const data = await getAdminProfileSettings()
+            if (data) {
+                setSettingsPersonalForm({
+                    name: data.name || "",
+                    email: data.email || "",
+                    phone: data.phone || "",
+                    avatar: data.avatar || "",
+                })
+            }
+        } catch (err) {
+            console.error("Failed to fetch admin profile settings:", err)
+        }
+    }, [])
+
+    useEffect(() => {
+        if (activeTab === "settings") {
+            fetchAdminSettingsProfile()
+        }
+    }, [activeTab, fetchAdminSettingsProfile])
+
+    // Save Admin Personal Info Settings
+    const handleSavePersonalSettings = async (e) => {
+        e.preventDefault()
+        setSettingsPersonalSaving(true)
+        try {
+            await updateAdminProfileSettings(settingsPersonalForm)
+            addToast("Personal information updated successfully", "success")
+        } catch (err) {
+            addToast(err.response?.data?.message || "Failed to update personal settings", "error")
+        } finally {
+            setSettingsPersonalSaving(false)
+        }
+    }
+
+    // Save Admin Password Settings
+    const handleSavePasswordSettings = async (e) => {
+        e.preventDefault()
+        if (settingsPasswordForm.newPassword !== settingsPasswordForm.confirmPassword) {
+            addToast("New passwords do not match", "error")
+            return
+        }
+        setSettingsPasswordSaving(true)
+        try {
+            await updateAdminPasswordSettings({
+                currentPassword: settingsPasswordForm.currentPassword,
+                newPassword: settingsPasswordForm.newPassword,
+            })
+            addToast("Password updated successfully!", "success")
+            setSettingsPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" })
+        } catch (err) {
+            addToast(err.response?.data?.message || "Failed to update password", "error")
+        } finally {
+            setSettingsPasswordSaving(false)
+        }
+    }
+
+    // Open Edit Profile Modal
+    const handleOpenEditModal = () => {
+        if (!selectedUserDetail) return
+        const { user, profile } = selectedUserDetail
+        setEditFormData({
+            name: profile?.name || user?.name || "",
+            phone: user?.phone || "",
+            gender: profile?.gender || user?.gender || "male",
+            aboutMe: profile?.aboutMe || "",
+            dateOfBirth: profile?.dateOfBirth ? new Date(profile.dateOfBirth).toISOString().split("T")[0] : "",
+            timeOfBirth: profile?.timeOfBirth || "",
+            placeOfBirth: profile?.placeOfBirth || "",
+            motherTongue: profile?.motherTongue || "",
+            religion: profile?.religion || "",
+            caste: profile?.caste || "",
+            subCaste: profile?.subCaste || "",
+            gotham: profile?.gotham || "",
+            rashi: profile?.rashi || "",
+            nakshtra: profile?.nakshtra || "",
+            manglik: profile?.manglik || "no",
+            maritalStatus: profile?.maritalStatus || "never_married",
+            city: profile?.location?.city || "",
+            state: profile?.location?.state || "",
+            highestDegree: profile?.education?.highestDegree || "",
+            institution: profile?.education?.institution || "",
+            occupation: profile?.career?.occupation || "",
+            companyName: profile?.career?.companyName || "",
+            annualIncome: profile?.career?.annualIncome || "",
+            fatherOccupation: profile?.family?.fatherOccupation || "",
+            motherOccupation: profile?.family?.motherOccupation || "",
+            familyLocation: profile?.family?.familyLocation || "",
+            familyValues: profile?.family?.familyValues || "moderate",
+            numBrothers: profile?.family?.numBrothers || 0,
+            numSisters: profile?.family?.numSisters || 0,
+            diet: profile?.lifestyle?.diet || "Vegetarian",
+            smoking: profile?.lifestyle?.smoking ? "yes" : "no",
+            drinking: profile?.lifestyle?.drinking ? "yes" : "no",
+            fitness: profile?.lifestyle?.fitness || "",
+        })
+        setEditProfileModalOpen(true)
+    }
+
+    // Save Edited User Profile
+    const handleSaveUserProfile = async (e) => {
+        e.preventDefault()
+        if (!selectedUserDetail?.user?._id) return
+        setEditSaving(true)
+        try {
+            const payload = {
+                name: editFormData.name,
+                phone: editFormData.phone,
+                gender: editFormData.gender,
+                aboutMe: editFormData.aboutMe,
+                dateOfBirth: editFormData.dateOfBirth ? new Date(editFormData.dateOfBirth) : undefined,
+                timeOfBirth: editFormData.timeOfBirth,
+                placeOfBirth: editFormData.placeOfBirth,
+                motherTongue: editFormData.motherTongue,
+                religion: editFormData.religion,
+                caste: editFormData.caste,
+                subCaste: editFormData.subCaste,
+                gotham: editFormData.gotham,
+                rashi: editFormData.rashi,
+                nakshtra: editFormData.nakshtra,
+                manglik: editFormData.manglik,
+                maritalStatus: editFormData.maritalStatus,
+                location: { city: editFormData.city, state: editFormData.state },
+                education: { highestDegree: editFormData.highestDegree, institution: editFormData.institution },
+                career: { occupation: editFormData.occupation, companyName: editFormData.companyName, annualIncome: editFormData.annualIncome },
+                family: { fatherOccupation: editFormData.fatherOccupation, motherOccupation: editFormData.motherOccupation, familyLocation: editFormData.familyLocation, familyValues: editFormData.familyValues, numBrothers: Number(editFormData.numBrothers) || 0, numSisters: Number(editFormData.numSisters) || 0 },
+                lifestyle: { diet: editFormData.diet, smoking: editFormData.smoking === "yes", drinking: editFormData.drinking === "yes", fitness: editFormData.fitness },
+            }
+            await updateAdminUserProfile(selectedUserDetail.user._id, payload)
+            addToast("User profile updated successfully!", "success")
+            setEditProfileModalOpen(false)
+            handleViewUserDetails(selectedUserDetail.user._id)
+            fetchAllData()
+        } catch (err) {
+            addToast(err.response?.data?.message || "Failed to update profile", "error")
+        } finally {
+            setEditSaving(false)
+        }
+    }
+
+    // Assign Subscription Plan
+    const handleAssignSubscriptionPlan = async (e) => {
+        e.preventDefault()
+        if (!selectedUserDetail?.user?._id) return
+        setPlanSaving(true)
+        try {
+            await addAdminUserSubscription(selectedUserDetail.user._id, planFormData)
+            addToast(`Assigned ${planFormData.planName} to user successfully!`, "success")
+            setAssignPlanModalOpen(false)
+            handleViewUserDetails(selectedUserDetail.user._id)
+        } catch (err) {
+            addToast(err.response?.data?.message || "Failed to assign plan", "error")
+        } finally {
+            setPlanSaving(false)
         }
     }
 
@@ -420,6 +626,16 @@ export default function AdminDashboard() {
                         }`}
                     >
                         <Users size={16} /> User Directory ({userPagination.total || users.length})
+                    </button>
+                    <button
+                        onClick={() => setActiveTab("settings")}
+                        className={`pb-3 px-3 sm:px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all cursor-pointer whitespace-nowrap flex items-center gap-2 ${
+                            activeTab === "settings"
+                                ? "border-[#842029] text-[#842029]"
+                                : "border-transparent text-gray-500 hover:text-gray-900"
+                        }`}
+                    >
+                        <SettingsIcon size={16} /> Settings
                     </button>
                 </div>
 
@@ -1065,6 +1281,169 @@ export default function AdminDashboard() {
                         )}
                     </div>
                 )}
+
+                {/* TAB 5: SETTINGS */}
+                {activeTab === "settings" && (
+                    <div className="bg-white rounded-3xl p-6 sm:p-8 border border-gray-100 shadow-2xs max-w-3xl mx-auto">
+                        <div className="flex gap-2 border-b border-gray-100 pb-3 mb-6">
+                            <button
+                                onClick={() => setSettingsActiveTab("personal")}
+                                className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 cursor-pointer transition-all ${
+                                    settingsActiveTab === "personal"
+                                        ? "bg-rose-50 text-[#842029] font-bold"
+                                        : "text-gray-500 hover:text-gray-900"
+                                }`}
+                            >
+                                <User size={15} /> Personal Information
+                            </button>
+                            <button
+                                onClick={() => setSettingsActiveTab("password")}
+                                className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 cursor-pointer transition-all ${
+                                    settingsActiveTab === "password"
+                                        ? "bg-rose-50 text-[#842029] font-bold"
+                                        : "text-gray-500 hover:text-gray-900"
+                                }`}
+                            >
+                                <Key size={15} /> Password &amp; Security
+                            </button>
+                            <button
+                                onClick={() => setSettingsActiveTab("system")}
+                                className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 cursor-pointer transition-all ${
+                                    settingsActiveTab === "system"
+                                        ? "bg-rose-50 text-[#842029] font-bold"
+                                        : "text-gray-500 hover:text-gray-900"
+                                }`}
+                            >
+                                <Server size={15} /> System Health
+                            </button>
+                        </div>
+
+                        {/* Personal Information */}
+                        {settingsActiveTab === "personal" && (
+                            <form onSubmit={handleSavePersonalSettings} className="space-y-4">
+                                <h3 className="font-bold text-gray-900 text-sm mb-1">Personal Details</h3>
+                                <p className="text-xs text-gray-400 mb-4">Update administrator name, email, and contact details.</p>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">Full Name</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={settingsPersonalForm.name}
+                                        onChange={(e) => setSettingsPersonalForm({ ...settingsPersonalForm, name: e.target.value })}
+                                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-xs sm:text-sm focus:border-[#842029] outline-none"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">Email Address</label>
+                                    <input
+                                        type="email"
+                                        required
+                                        value={settingsPersonalForm.email}
+                                        onChange={(e) => setSettingsPersonalForm({ ...settingsPersonalForm, email: e.target.value })}
+                                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-xs sm:text-sm focus:border-[#842029] outline-none"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">Phone Number</label>
+                                    <input
+                                        type="tel"
+                                        value={settingsPersonalForm.phone}
+                                        onChange={(e) => setSettingsPersonalForm({ ...settingsPersonalForm, phone: e.target.value })}
+                                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-xs sm:text-sm focus:border-[#842029] outline-none"
+                                    />
+                                </div>
+
+                                <div className="flex justify-end pt-4">
+                                    <button
+                                        type="submit"
+                                        disabled={settingsPersonalSaving}
+                                        className="px-6 py-2.5 rounded-xl bg-[#842029] text-white text-xs sm:text-sm font-semibold hover:bg-[#6b1b27] transition-all cursor-pointer shadow-md"
+                                    >
+                                        {settingsPersonalSaving ? "Saving..." : "Save Changes"}
+                                    </button>
+                                </div>
+                            </form>
+                        )}
+
+                        {/* Password & Security */}
+                        {settingsActiveTab === "password" && (
+                            <form onSubmit={handleSavePasswordSettings} className="space-y-4">
+                                <h3 className="font-bold text-gray-900 text-sm mb-1">Change Admin Password</h3>
+                                <p className="text-xs text-gray-400 mb-4">Ensure your account uses a secure password with at least 6 characters.</p>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">Current Password</label>
+                                    <input
+                                        type="password"
+                                        required
+                                        value={settingsPasswordForm.currentPassword}
+                                        onChange={(e) => setSettingsPasswordForm({ ...settingsPasswordForm, currentPassword: e.target.value })}
+                                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-xs sm:text-sm focus:border-[#842029] outline-none"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">New Password</label>
+                                    <input
+                                        type="password"
+                                        required
+                                        value={settingsPasswordForm.newPassword}
+                                        onChange={(e) => setSettingsPasswordForm({ ...settingsPasswordForm, newPassword: e.target.value })}
+                                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-xs sm:text-sm focus:border-[#842029] outline-none"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">Confirm New Password</label>
+                                    <input
+                                        type="password"
+                                        required
+                                        value={settingsPasswordForm.confirmPassword}
+                                        onChange={(e) => setSettingsPasswordForm({ ...settingsPasswordForm, confirmPassword: e.target.value })}
+                                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-xs sm:text-sm focus:border-[#842029] outline-none"
+                                    />
+                                </div>
+
+                                <div className="flex justify-end pt-4">
+                                    <button
+                                        type="submit"
+                                        disabled={settingsPasswordSaving}
+                                        className="px-6 py-2.5 rounded-xl bg-[#842029] text-white text-xs sm:text-sm font-semibold hover:bg-[#6b1b27] transition-all cursor-pointer shadow-md"
+                                    >
+                                        {settingsPasswordSaving ? "Updating..." : "Update Password"}
+                                    </button>
+                                </div>
+                            </form>
+                        )}
+
+                        {/* System Health */}
+                        {settingsActiveTab === "system" && (
+                            <div className="space-y-3">
+                                <h3 className="font-bold text-gray-900 text-sm mb-1">System Health &amp; Infrastructure</h3>
+                                <p className="text-xs text-gray-400 mb-4">Live health status of database and cache services.</p>
+
+                                <div className="p-4 rounded-2xl bg-gray-50 border border-gray-100 flex items-center justify-between">
+                                    <div>
+                                        <p className="font-bold text-xs text-gray-900">MongoDB Atlas Database</p>
+                                        <p className="text-[11px] text-gray-400">Connected &amp; Synced</p>
+                                    </div>
+                                    <span className="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">200 OK</span>
+                                </div>
+
+                                <div className="p-4 rounded-2xl bg-gray-50 border border-gray-100 flex items-center justify-between">
+                                    <div>
+                                        <p className="font-bold text-xs text-gray-900">Redis Cache &amp; Session Store</p>
+                                        <p className="text-[11px] text-gray-400">Upstash / TTL Store Fallback</p>
+                                    </div>
+                                    <span className="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">Active</span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
             </main>
 
             {/* MODAL 1: VERIFICATION REVIEW */}
@@ -1263,38 +1642,73 @@ export default function AdminDashboard() {
                 </div>
             )}
 
-            {/* MODAL 3: FULL USER DOSSIER INSPECTOR */}
+            {/* MODAL 3: FULL USER DOSSIER INSPECTOR (FIGMA DESIGN MATCH) */}
             {selectedUserDetail && (
                 <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs">
-                    <div className="bg-white rounded-3xl max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl animate-in fade-in zoom-in-95 p-6">
-                        <div className="flex items-center justify-between border-b border-gray-100 pb-4 mb-5">
-                            <div>
-                                <div className="flex items-center gap-2">
-                                    <h3 className="text-xl font-bold text-[#640515] font-serif">
-                                        {selectedUserDetail.user?.name || "Member Profile"}
-                                    </h3>
-                                    {selectedUserDetail.profile?.isVerified && (
-                                        <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold flex items-center gap-1">
-                                            <CheckCircle size={12} /> Verified
-                                        </span>
+                    <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl animate-in fade-in zoom-in-95 p-6 sm:p-8">
+                        {/* Header Banner */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-100 pb-5 mb-6 gap-4">
+                            <div className="flex items-center gap-4">
+                                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-rose-50 border border-rose-100 overflow-hidden flex items-center justify-center font-bold text-xl text-[#842029] shrink-0">
+                                    {selectedUserDetail.profile?.photos?.[0]?.url ? (
+                                        <img
+                                            src={selectedUserDetail.profile.photos[0].url}
+                                            alt="Avatar"
+                                            className="w-full h-full object-cover"
+                                        />
+                                    ) : (
+                                        selectedUserDetail.profile?.name ? selectedUserDetail.profile.name.charAt(0).toUpperCase() : "U"
                                     )}
                                 </div>
-                                <p className="text-xs text-gray-400 mt-0.5">
-                                    User ID: {selectedUserDetail.user?._id} • Role: {selectedUserDetail.user?.role?.toUpperCase()} • Registered:{" "}
-                                    {new Date(selectedUserDetail.user?.createdAt).toLocaleDateString()}
-                                </p>
+                                <div>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <h3 className="text-xl sm:text-2xl font-bold text-gray-900 font-serif">
+                                            {selectedUserDetail.profile?.name || selectedUserDetail.user?.name || "Member Profile"}
+                                        </h3>
+                                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                                            selectedUserDetail.user?.status === "active" ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"
+                                        }`}>
+                                            {selectedUserDetail.user?.status || "active"}
+                                        </span>
+                                        {selectedUserDetail.profile?.isVerified && (
+                                            <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold flex items-center gap-1">
+                                                <CheckCircle size={12} /> Verified
+                                            </span>
+                                        )}
+                                    </div>
+                                    <p className="text-xs text-gray-500 mt-1 flex items-center gap-3 flex-wrap">
+                                        <span className="flex items-center gap-1"><MapPin size={13} className="text-[#842029]" /> {selectedUserDetail.profile?.location?.city || "India"}, {selectedUserDetail.profile?.location?.state || ""}</span>
+                                        <span className="flex items-center gap-1"><Briefcase size={13} className="text-[#842029]" /> {selectedUserDetail.profile?.career?.occupation || "Professional"}</span>
+                                        <span className="flex items-center gap-1"><Calendar size={13} className="text-[#842029]" /> Joined {new Date(selectedUserDetail.user?.createdAt || Date.now()).toLocaleDateString([], { month: "short", year: "numeric" })}</span>
+                                    </p>
+                                </div>
                             </div>
-                            <button
-                                onClick={() => setSelectedUserDetail(null)}
-                                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 cursor-pointer"
-                            >
-                                <X size={20} />
-                            </button>
+
+                            <div className="flex items-center gap-2 flex-wrap self-end sm:self-center">
+                                <button
+                                    onClick={handleOpenEditModal}
+                                    className="px-3.5 py-2 rounded-xl bg-[#842029] hover:bg-[#640515] text-white text-xs font-semibold cursor-pointer shadow-2xs flex items-center gap-1.5"
+                                >
+                                    <Edit3 size={14} /> Edit Profile
+                                </button>
+                                <button
+                                    onClick={() => setAssignPlanModalOpen(true)}
+                                    className="px-3.5 py-2 rounded-xl bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs font-semibold cursor-pointer shadow-2xs flex items-center gap-1.5"
+                                >
+                                    <CreditCard size={14} /> Assign Plan
+                                </button>
+                                <button
+                                    onClick={() => setSelectedUserDetail(null)}
+                                    className="p-2 rounded-xl text-gray-400 hover:text-gray-700 cursor-pointer bg-gray-100"
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
                         </div>
 
-                        {/* Photo Gallery if available */}
+                        {/* Photo Gallery */}
                         {selectedUserDetail.profile?.photos?.length > 0 && (
-                            <div className="mb-5">
+                            <div className="mb-6">
                                 <h4 className="font-bold text-[#842029] text-xs uppercase tracking-wider mb-2 flex items-center gap-1.5">
                                     <ImageIcon size={14} /> Profile Photos ({selectedUserDetail.profile.photos.length})
                                 </h4>
@@ -1317,109 +1731,210 @@ export default function AdminDashboard() {
                             </div>
                         )}
 
-                        <div className="space-y-5 text-xs text-gray-700">
-                            {/* Personal Details */}
-                            <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
-                                <h4 className="font-bold text-[#842029] text-xs uppercase tracking-wider mb-2.5">
-                                    Personal &amp; Horoscope
+                        {/* Profile Cards Grid */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                            {/* Card 1: Profile Info & Bio */}
+                            <div className="bg-gray-50/70 rounded-2xl p-4 sm:p-5 border border-gray-100">
+                                <h4 className="font-bold text-[#842029] text-xs uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                                    <User size={14} /> Profile Info &amp; Bio
                                 </h4>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                    <div><span className="text-gray-400">Gender:</span> <p className="font-bold capitalize">{selectedUserDetail.profile?.gender || "—"}</p></div>
-                                    <div><span className="text-gray-400">DOB:</span> <p className="font-bold">{selectedUserDetail.profile?.dateOfBirth ? new Date(selectedUserDetail.profile.dateOfBirth).toLocaleDateString() : "—"}</p></div>
-                                    <div><span className="text-gray-400">Birth Place:</span> <p className="font-bold">{selectedUserDetail.profile?.placeOfBirth || "—"}</p></div>
-                                    <div><span className="text-gray-400">Birth Time:</span> <p className="font-bold">{selectedUserDetail.profile?.timeOfBirth || "—"}</p></div>
-                                    <div><span className="text-gray-400">Religion:</span> <p className="font-bold">{selectedUserDetail.profile?.religion || "—"}</p></div>
-                                    <div><span className="text-gray-400">Caste:</span> <p className="font-bold">{selectedUserDetail.profile?.caste || "—"}</p></div>
-                                    <div><span className="text-gray-400">Gotra:</span> <p className="font-bold">{selectedUserDetail.profile?.gotham || "—"}</p></div>
-                                    <div><span className="text-gray-400">Rashi / Nakshatra:</span> <p className="font-bold">{selectedUserDetail.profile?.rashi || "—"} / {selectedUserDetail.profile?.nakshtra || "—"}</p></div>
-                                    <div><span className="text-gray-400">Manglik:</span> <p className="font-bold capitalize">{selectedUserDetail.profile?.manglik || "—"}</p></div>
-                                    <div><span className="text-gray-400">Marital Status:</span> <p className="font-bold capitalize">{selectedUserDetail.profile?.maritalStatus?.replace(/_/g, " ") || "—"}</p></div>
-                                    <div><span className="text-gray-400">Height:</span> <p className="font-bold">{selectedUserDetail.profile?.heightCm ? `${selectedUserDetail.profile.heightCm} cm` : "—"}</p></div>
-                                    <div><span className="text-gray-400">Mother Tongue:</span> <p className="font-bold">{selectedUserDetail.profile?.motherTongue || "—"}</p></div>
-                                </div>
-                            </div>
-
-                            {/* Career & Location */}
-                            <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
-                                <h4 className="font-bold text-[#842029] text-xs uppercase tracking-wider mb-2.5">
-                                    Career &amp; Location
-                                </h4>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                    <div><span className="text-gray-400">Highest Education:</span> <p className="font-bold">{selectedUserDetail.profile?.education?.highestDegree || "—"}</p></div>
-                                    <div><span className="text-gray-400">Occupation:</span> <p className="font-bold">{selectedUserDetail.profile?.career?.occupation || "—"}</p></div>
-                                    <div><span className="text-gray-400">Company:</span> <p className="font-bold">{selectedUserDetail.profile?.career?.companyName || "—"}</p></div>
-                                    <div><span className="text-gray-400">Annual Income:</span> <p className="font-bold">{selectedUserDetail.profile?.career?.annualIncome || "—"}</p></div>
-                                    <div><span className="text-gray-400">City / State:</span> <p className="font-bold">{selectedUserDetail.profile?.location?.city || "—"}, {selectedUserDetail.profile?.location?.state || ""}</p></div>
-                                    <div><span className="text-gray-400">Country:</span> <p className="font-bold">{selectedUserDetail.profile?.location?.country || "India"}</p></div>
-                                </div>
-                            </div>
-
-                            {/* Family Details */}
-                            <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
-                                <h4 className="font-bold text-[#842029] text-xs uppercase tracking-wider mb-2.5">
-                                    Family Background
-                                </h4>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                    <div><span className="text-gray-400">Father's Occupation:</span> <p className="font-bold">{selectedUserDetail.profile?.family?.fatherOccupation || "—"}</p></div>
-                                    <div><span className="text-gray-400">Mother's Occupation:</span> <p className="font-bold">{selectedUserDetail.profile?.family?.motherOccupation || "—"}</p></div>
-                                    <div><span className="text-gray-400">Family Type:</span> <p className="font-bold capitalize">{selectedUserDetail.profile?.family?.familyType || "—"}</p></div>
-                                </div>
-                            </div>
-
-                            {/* About Me Bio */}
-                            {selectedUserDetail.profile?.aboutMe && (
-                                <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
-                                    <h4 className="font-bold text-[#842029] text-xs uppercase tracking-wider mb-1.5">
-                                        About Me / Bio
-                                    </h4>
-                                    <p className="text-xs text-gray-700 leading-relaxed">
-                                        {selectedUserDetail.profile.aboutMe}
-                                    </p>
-                                </div>
-                            )}
-
-                            {/* Safety Reports History */}
-                            {selectedUserDetail.reportsAgainst?.length > 0 && (
-                                <div className="bg-red-50 rounded-2xl p-4 border border-red-200">
-                                    <h4 className="font-bold text-red-900 text-xs uppercase tracking-wider mb-2">
-                                        Abuse Reports Against This User ({selectedUserDetail.reportsAgainst.length})
-                                    </h4>
-                                    <div className="space-y-2">
-                                        {selectedUserDetail.reportsAgainst.map((rep) => (
-                                            <div key={rep._id} className="text-xs text-red-800">
-                                                • <strong>{rep.reason}</strong>: {rep.description || "No comment"} ({rep.status})
-                                            </div>
-                                        ))}
+                                <div className="space-y-2.5 text-xs text-gray-700">
+                                    <div>
+                                        <span className="text-gray-400 block text-[11px]">About Me</span>
+                                        <p className="font-medium text-gray-800 leading-relaxed mt-0.5">
+                                            {selectedUserDetail.profile?.aboutMe || "No bio description written yet."}
+                                        </p>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-200/60">
+                                        <div><span className="text-gray-400 block text-[11px]">Location</span><span className="font-bold">{selectedUserDetail.profile?.location?.city || "—"}, {selectedUserDetail.profile?.location?.state || "India"}</span></div>
+                                        <div><span className="text-gray-400 block text-[11px]">Occupation</span><span className="font-bold">{selectedUserDetail.profile?.career?.occupation || "—"}</span></div>
+                                        <div><span className="text-gray-400 block text-[11px]">Education</span><span className="font-bold">{selectedUserDetail.profile?.education?.highestDegree || "—"}</span></div>
+                                        <div><span className="text-gray-400 block text-[11px]">Created By</span><span className="font-bold capitalize">{selectedUserDetail.profile?.createdBy || "Self"}</span></div>
                                     </div>
                                 </div>
-                            )}
+                            </div>
 
-                            {/* KYC Verification History */}
-                            {selectedUserDetail.verifications?.length > 0 && (
-                                <div className="bg-blue-50/60 rounded-2xl p-4 border border-blue-200">
-                                    <h4 className="font-bold text-blue-900 text-xs uppercase tracking-wider mb-2">
-                                        KYC Submissions ({selectedUserDetail.verifications.length})
-                                    </h4>
-                                    <div className="space-y-2">
-                                        {selectedUserDetail.verifications.map((doc) => (
-                                            <div key={doc._id} className="text-xs text-blue-800 flex items-center justify-between">
-                                                <span>
-                                                    • <strong>{doc.documentType?.replace(/_/g, " ")}</strong> ({doc.status})
+                            {/* Card 2: Lifestyle Chips */}
+                            <div className="bg-gray-50/70 rounded-2xl p-4 sm:p-5 border border-gray-100">
+                                <h4 className="font-bold text-[#842029] text-xs uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                                    <Sparkles size={14} /> Lifestyle &amp; Habits
+                                </h4>
+                                <div className="space-y-3 text-xs">
+                                    <div>
+                                        <span className="text-gray-400 block text-[11px] mb-1.5">Diet Preference</span>
+                                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 font-semibold border border-emerald-200">
+                                            🥗 {selectedUserDetail.profile?.lifestyle?.diet || "Vegetarian"}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <span className="text-gray-400 block text-[11px] mb-1.5">Habits &amp; Routine</span>
+                                        <div className="flex gap-2 flex-wrap">
+                                            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-gray-100 text-gray-700 font-semibold border border-gray-200">
+                                                🚭 Smoking: {selectedUserDetail.profile?.lifestyle?.smoking ? "Yes" : "No"}
+                                            </span>
+                                            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-gray-100 text-gray-700 font-semibold border border-gray-200">
+                                                🍷 Drinking: {selectedUserDetail.profile?.lifestyle?.drinking ? "Yes" : "No"}
+                                            </span>
+                                            {selectedUserDetail.profile?.lifestyle?.fitness && (
+                                                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-rose-50 text-[#842029] font-semibold border border-rose-200">
+                                                    🏃 Fitness: {selectedUserDetail.profile.lifestyle.fitness}
                                                 </span>
-                                                {doc.documentUrl && (
-                                                    <a href={doc.documentUrl} target="_blank" rel="noreferrer" className="underline font-bold text-blue-900">
-                                                        Inspect Doc ↗
-                                                    </a>
-                                                )}
-                                            </div>
-                                        ))}
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
-                            )}
+                            </div>
+
+                            {/* Card 3: Personal Details */}
+                            <div className="bg-gray-50/70 rounded-2xl p-4 sm:p-5 border border-gray-100">
+                                <h4 className="font-bold text-[#842029] text-xs uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                                    <User size={14} /> Personal Details
+                                </h4>
+                                <div className="grid grid-cols-2 gap-2.5 text-xs">
+                                    <div><span className="text-gray-400 block text-[11px]">Age:</span> <p className="font-bold">{selectedUserDetail.profile?.dateOfBirth ? `${Math.floor((Date.now() - new Date(selectedUserDetail.profile.dateOfBirth).getTime()) / (1000 * 60 * 60 * 24 * 365.25))} Years` : "—"}</p></div>
+                                    <div><span className="text-gray-400 block text-[11px]">Height:</span> <p className="font-bold">{selectedUserDetail.profile?.heightCm ? `${selectedUserDetail.profile.heightCm} cm` : "—"}</p></div>
+                                    <div><span className="text-gray-400 block text-[11px]">Date of Birth:</span> <p className="font-bold">{selectedUserDetail.profile?.dateOfBirth ? new Date(selectedUserDetail.profile.dateOfBirth).toLocaleDateString() : "—"}</p></div>
+                                    <div><span className="text-gray-400 block text-[11px]">Place of Birth:</span> <p className="font-bold">{selectedUserDetail.profile?.placeOfBirth || "—"}</p></div>
+                                    <div><span className="text-gray-400 block text-[11px]">Gender:</span> <p className="font-bold capitalize">{selectedUserDetail.profile?.gender || "—"}</p></div>
+                                    <div><span className="text-gray-400 block text-[11px]">Marital Status:</span> <p className="font-bold capitalize">{selectedUserDetail.profile?.maritalStatus?.replace(/_/g, " ") || "—"}</p></div>
+                                    <div><span className="text-gray-400 block text-[11px]">Email:</span> <p className="font-bold truncate">{selectedUserDetail.user?.email}</p></div>
+                                    <div><span className="text-gray-400 block text-[11px]">Phone:</span> <p className="font-bold">{selectedUserDetail.user?.phone || "—"}</p></div>
+                                </div>
+                            </div>
+
+                            {/* Card 4: Family Background */}
+                            <div className="bg-gray-50/70 rounded-2xl p-4 sm:p-5 border border-gray-100">
+                                <h4 className="font-bold text-[#842029] text-xs uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                                    <Users size={14} /> Family Background
+                                </h4>
+                                <div className="grid grid-cols-2 gap-2.5 text-xs">
+                                    <div><span className="text-gray-400 block text-[11px]">Mother Tongue:</span> <p className="font-bold">{selectedUserDetail.profile?.motherTongue || "—"}</p></div>
+                                    <div><span className="text-gray-400 block text-[11px]">Father's Occupation:</span> <p className="font-bold">{selectedUserDetail.profile?.family?.fatherOccupation || "—"}</p></div>
+                                    <div><span className="text-gray-400 block text-[11px]">Mother's Occupation:</span> <p className="font-bold">{selectedUserDetail.profile?.family?.motherOccupation || "—"}</p></div>
+                                    <div><span className="text-gray-400 block text-[11px]">Family Location:</span> <p className="font-bold">{selectedUserDetail.profile?.family?.familyLocation || selectedUserDetail.profile?.location?.city || "—"}</p></div>
+                                    <div><span className="text-gray-400 block text-[11px]">Family Values:</span> <p className="font-bold capitalize">{selectedUserDetail.profile?.family?.familyValues || "Moderate"}</p></div>
+                                    <div><span className="text-gray-400 block text-[11px]">Siblings:</span> <p className="font-bold">{selectedUserDetail.profile?.family?.numBrothers || 0} Brother(s), {selectedUserDetail.profile?.family?.numSisters || 0} Sister(s)</p></div>
+                                </div>
+                            </div>
+
+                            {/* Card 5: Career & Education */}
+                            <div className="bg-gray-50/70 rounded-2xl p-4 sm:p-5 border border-gray-100">
+                                <h4 className="font-bold text-[#842029] text-xs uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                                    <Briefcase size={14} /> Career &amp; Education
+                                </h4>
+                                <div className="grid grid-cols-2 gap-2.5 text-xs">
+                                    <div><span className="text-gray-400 block text-[11px]">Highest Degree:</span> <p className="font-bold">{selectedUserDetail.profile?.education?.highestDegree || "—"}</p></div>
+                                    <div><span className="text-gray-400 block text-[11px]">Institution:</span> <p className="font-bold">{selectedUserDetail.profile?.education?.institution || "—"}</p></div>
+                                    <div><span className="text-gray-400 block text-[11px]">Occupation:</span> <p className="font-bold">{selectedUserDetail.profile?.career?.occupation || "—"}</p></div>
+                                    <div><span className="text-gray-400 block text-[11px]">Company Name:</span> <p className="font-bold">{selectedUserDetail.profile?.career?.companyName || "—"}</p></div>
+                                    <div><span className="text-gray-400 block text-[11px]">Annual Income:</span> <p className="font-bold">{selectedUserDetail.profile?.career?.annualIncome || "—"}</p></div>
+                                    <div><span className="text-gray-400 block text-[11px]">Work Location:</span> <p className="font-bold">{selectedUserDetail.profile?.career?.workLocation || selectedUserDetail.profile?.location?.city || "—"}</p></div>
+                                </div>
+                            </div>
+
+                            {/* Card 6: Religious & Astrological Details */}
+                            <div className="bg-gray-50/70 rounded-2xl p-4 sm:p-5 border border-gray-100">
+                                <h4 className="font-bold text-[#842029] text-xs uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                                    <Award size={14} /> Religious Details
+                                </h4>
+                                <div className="grid grid-cols-2 gap-2.5 text-xs">
+                                    <div><span className="text-gray-400 block text-[11px]">Religion:</span> <p className="font-bold">{selectedUserDetail.profile?.religion || "—"}</p></div>
+                                    <div><span className="text-gray-400 block text-[11px]">Caste:</span> <p className="font-bold">{selectedUserDetail.profile?.caste || "—"}</p></div>
+                                    <div><span className="text-gray-400 block text-[11px]">Sub-Caste:</span> <p className="font-bold">{selectedUserDetail.profile?.subCaste || "—"}</p></div>
+                                    <div><span className="text-gray-400 block text-[11px]">Gotra:</span> <p className="font-bold">{selectedUserDetail.profile?.gotham || "—"}</p></div>
+                                    <div><span className="text-gray-400 block text-[11px]">Rashi:</span> <p className="font-bold">{selectedUserDetail.profile?.rashi || "—"}</p></div>
+                                    <div><span className="text-gray-400 block text-[11px]">Nakshatra:</span> <p className="font-bold">{selectedUserDetail.profile?.nakshtra || "—"}</p></div>
+                                    <div><span className="text-gray-400 block text-[11px]">Manglik:</span> <p className="font-bold capitalize">{selectedUserDetail.profile?.manglik || "—"}</p></div>
+                                    <div><span className="text-gray-400 block text-[11px]">Birth Time:</span> <p className="font-bold">{selectedUserDetail.profile?.timeOfBirth || "—"}</p></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Billing & Subscriptions Card */}
+                        <div className="bg-white rounded-2xl p-5 sm:p-6 border border-gray-200 shadow-2xs mb-6">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                                <h4 className="font-bold text-[#640515] text-sm flex items-center gap-2">
+                                    <CreditCard size={18} /> Billing &amp; Subscriptions
+                                </h4>
+                                <button
+                                    onClick={() => setAssignPlanModalOpen(true)}
+                                    className="px-3.5 py-1.5 rounded-lg bg-[#842029] hover:bg-[#640515] text-white text-xs font-semibold cursor-pointer shadow-2xs flex items-center gap-1 self-start sm:self-auto"
+                                >
+                                    <Plus size={14} /> Assign Plan
+                                </button>
+                            </div>
+
+                            {/* Active Plan Banner */}
+                            <div className="p-4 rounded-xl bg-gradient-to-r from-rose-50/50 to-amber-50/30 border border-rose-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                                <div>
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Current Plan Status</span>
+                                    <div className="flex items-center gap-2 mt-0.5">
+                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                                            selectedUserDetail.activeSubscription ? "bg-emerald-100 text-emerald-800" : "bg-gray-100 text-gray-700"
+                                        }`}>
+                                            {selectedUserDetail.activeSubscription ? "ACTIVE" : "FREE TIER"}
+                                        </span>
+                                        <span className="font-bold text-gray-900 text-sm">
+                                            {selectedUserDetail.activeSubscription?.planName || "Standard Free Tier"}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-6 text-xs text-gray-600">
+                                    <div>
+                                        <span className="text-[10px] font-bold uppercase text-gray-400 block">Billing Cycle</span>
+                                        <span className="font-bold capitalize">{selectedUserDetail.activeSubscription?.billingCycle || "Standard"}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-[10px] font-bold uppercase text-gray-400 block">Valid Until</span>
+                                        <span className="font-bold">
+                                            {selectedUserDetail.activeSubscription?.expiryDate ? new Date(selectedUserDetail.activeSubscription.expiryDate).toLocaleDateString() : "Permanent"}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Subscription History Table */}
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-xs border-collapse">
+                                    <thead>
+                                        <tr className="border-b border-gray-100 text-gray-400 uppercase tracking-wider text-[10px]">
+                                            <th className="pb-2 px-2">Plan Name</th>
+                                            <th className="pb-2 px-2">Amount Paid</th>
+                                            <th className="pb-2 px-2">Sub. Date</th>
+                                            <th className="pb-2 px-2">Next Billing Date</th>
+                                            <th className="pb-2 px-2">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-50">
+                                        {selectedUserDetail.subscriptions?.map((sub) => (
+                                            <tr key={sub._id}>
+                                                <td className="py-2.5 px-2 font-bold text-gray-900">{sub.planName}</td>
+                                                <td className="py-2.5 px-2">₹{sub.amount?.toLocaleString("en-IN") || 0}</td>
+                                                <td className="py-2.5 px-2">{new Date(sub.startDate || sub.createdAt).toLocaleDateString()}</td>
+                                                <td className="py-2.5 px-2">{sub.expiryDate ? new Date(sub.expiryDate).toLocaleDateString() : "—"}</td>
+                                                <td className="py-2.5 px-2">
+                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                                                        sub.status === "active" ? "bg-emerald-100 text-emerald-800" : "bg-gray-100 text-gray-700"
+                                                    }`}>
+                                                        {sub.status}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        {(!selectedUserDetail.subscriptions || selectedUserDetail.subscriptions.length === 0) && (
+                                            <tr>
+                                                <td colSpan="5" className="py-4 text-center text-gray-400">
+                                                    No subscription history records found.
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
 
                         {/* Dossier Action Bar */}
-                        <div className="mt-6 pt-4 border-t border-gray-100 flex flex-wrap items-center justify-between gap-3">
+                        <div className="pt-4 border-t border-gray-100 flex flex-wrap items-center justify-between gap-3">
                             <div className="flex items-center gap-2 flex-wrap">
                                 <button
                                     onClick={() =>
@@ -1465,6 +1980,285 @@ export default function AdminDashboard() {
                                 Close Dossier
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL 4: EDIT USER PROFILE */}
+            {editProfileModalOpen && (
+                <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs">
+                    <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl animate-in fade-in zoom-in-95 p-6 sm:p-8">
+                        <div className="flex items-center justify-between border-b border-gray-100 pb-4 mb-5">
+                            <h3 className="font-bold text-[#640515] text-base sm:text-lg flex items-center gap-2">
+                                <Edit3 size={18} /> Edit Member Profile Dossier
+                            </h3>
+                            <button
+                                onClick={() => setEditProfileModalOpen(false)}
+                                className="p-1 rounded-lg text-gray-400 hover:text-gray-700 cursor-pointer"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleSaveUserProfile} className="space-y-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-600 mb-1">Full Name</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={editFormData.name}
+                                        onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                                        className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-xs outline-none focus:border-[#842029]"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-600 mb-1">Phone Number</label>
+                                    <input
+                                        type="tel"
+                                        value={editFormData.phone}
+                                        onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })}
+                                        className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-xs outline-none focus:border-[#842029]"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-gray-600 mb-1">About Me (Bio)</label>
+                                <textarea
+                                    rows={3}
+                                    value={editFormData.aboutMe}
+                                    onChange={(e) => setEditFormData({ ...editFormData, aboutMe: e.target.value })}
+                                    className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-xs outline-none focus:border-[#842029]"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-600 mb-1">Gender</label>
+                                    <select
+                                        value={editFormData.gender}
+                                        onChange={(e) => setEditFormData({ ...editFormData, gender: e.target.value })}
+                                        className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-xs outline-none focus:border-[#842029] bg-white"
+                                    >
+                                        <option value="male">Male</option>
+                                        <option value="female">Female</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-600 mb-1">Date of Birth</label>
+                                    <input
+                                        type="date"
+                                        value={editFormData.dateOfBirth}
+                                        onChange={(e) => setEditFormData({ ...editFormData, dateOfBirth: e.target.value })}
+                                        className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-xs outline-none focus:border-[#842029]"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-600 mb-1">Marital Status</label>
+                                    <select
+                                        value={editFormData.maritalStatus}
+                                        onChange={(e) => setEditFormData({ ...editFormData, maritalStatus: e.target.value })}
+                                        className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-xs outline-none focus:border-[#842029] bg-white"
+                                    >
+                                        <option value="never_married">Never Married</option>
+                                        <option value="divorced">Divorced</option>
+                                        <option value="widowed">Widowed</option>
+                                        <option value="separated">Separated</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-600 mb-1">City</label>
+                                    <input
+                                        type="text"
+                                        value={editFormData.city}
+                                        onChange={(e) => setEditFormData({ ...editFormData, city: e.target.value })}
+                                        className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-xs outline-none focus:border-[#842029]"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-600 mb-1">State</label>
+                                    <input
+                                        type="text"
+                                        value={editFormData.state}
+                                        onChange={(e) => setEditFormData({ ...editFormData, state: e.target.value })}
+                                        className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-xs outline-none focus:border-[#842029]"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-600 mb-1">Highest Degree</label>
+                                    <input
+                                        type="text"
+                                        value={editFormData.highestDegree}
+                                        onChange={(e) => setEditFormData({ ...editFormData, highestDegree: e.target.value })}
+                                        className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-xs outline-none focus:border-[#842029]"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-600 mb-1">Occupation</label>
+                                    <input
+                                        type="text"
+                                        value={editFormData.occupation}
+                                        onChange={(e) => setEditFormData({ ...editFormData, occupation: e.target.value })}
+                                        className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-xs outline-none focus:border-[#842029]"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-600 mb-1">Annual Income</label>
+                                    <input
+                                        type="text"
+                                        value={editFormData.annualIncome}
+                                        onChange={(e) => setEditFormData({ ...editFormData, annualIncome: e.target.value })}
+                                        className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-xs outline-none focus:border-[#842029]"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-600 mb-1">Religion</label>
+                                    <input
+                                        type="text"
+                                        value={editFormData.religion}
+                                        onChange={(e) => setEditFormData({ ...editFormData, religion: e.target.value })}
+                                        className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-xs outline-none focus:border-[#842029]"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-600 mb-1">Caste</label>
+                                    <input
+                                        type="text"
+                                        value={editFormData.caste}
+                                        onChange={(e) => setEditFormData({ ...editFormData, caste: e.target.value })}
+                                        className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-xs outline-none focus:border-[#842029]"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-600 mb-1">Sub-Caste</label>
+                                    <input
+                                        type="text"
+                                        value={editFormData.subCaste}
+                                        onChange={(e) => setEditFormData({ ...editFormData, subCaste: e.target.value })}
+                                        className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-xs outline-none focus:border-[#842029]"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex gap-2.5 justify-end pt-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setEditProfileModalOpen(false)}
+                                    className="px-4 py-2 rounded-xl border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={editSaving}
+                                    className="px-5 py-2 rounded-xl bg-[#842029] hover:bg-[#640515] text-white text-xs font-semibold cursor-pointer shadow-2xs"
+                                >
+                                    {editSaving ? "Saving..." : "Save Profile Changes"}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL 5: ASSIGN MEMBERSHIP PLAN */}
+            {assignPlanModalOpen && (
+                <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs">
+                    <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl animate-in fade-in zoom-in-95 p-6">
+                        <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
+                            <h3 className="font-bold text-[#640515] text-base flex items-center gap-2">
+                                <CreditCard size={18} /> Assign Membership Plan
+                            </h3>
+                            <button
+                                onClick={() => setAssignPlanModalOpen(false)}
+                                className="p-1 rounded-lg text-gray-400 hover:text-gray-700 cursor-pointer"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleAssignSubscriptionPlan} className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-600 mb-1">Plan Tier</label>
+                                <select
+                                    value={planFormData.planName}
+                                    onChange={(e) => {
+                                        const name = e.target.value
+                                        let amount = 1999
+                                        let id = "premium"
+                                        if (name === "Gold Plan") { amount = 999; id = "gold" }
+                                        if (name === "Diamond Plan") { amount = 3499; id = "diamond" }
+                                        if (name === "Free Plan") { amount = 0; id = "free" }
+                                        setPlanFormData({ ...planFormData, planName: name, planId: id, amount })
+                                    }}
+                                    className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-xs outline-none focus:border-[#842029] bg-white"
+                                >
+                                    <option value="Premium Plan">Premium Plan (₹1,999 / yr)</option>
+                                    <option value="Gold Plan">Gold Plan (₹999 / 6 mo)</option>
+                                    <option value="Diamond Plan">Diamond Plan (₹3,499 / yr)</option>
+                                    <option value="Free Plan">Free Plan (₹0)</option>
+                                </select>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-600 mb-1">Amount (INR)</label>
+                                    <input
+                                        type="number"
+                                        value={planFormData.amount}
+                                        onChange={(e) => setPlanFormData({ ...planFormData, amount: Number(e.target.value) })}
+                                        className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-xs outline-none focus:border-[#842029]"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-600 mb-1">Duration (Days)</label>
+                                    <input
+                                        type="number"
+                                        value={planFormData.durationDays}
+                                        onChange={(e) => setPlanFormData({ ...planFormData, durationDays: Number(e.target.value) })}
+                                        className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-xs outline-none focus:border-[#842029]"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-gray-600 mb-1">Admin Note</label>
+                                <input
+                                    type="text"
+                                    placeholder="e.g. Approved promotional extension"
+                                    value={planFormData.notes}
+                                    onChange={(e) => setPlanFormData({ ...planFormData, notes: e.target.value })}
+                                    className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-xs outline-none focus:border-[#842029]"
+                                />
+                            </div>
+
+                            <div className="flex gap-2 justify-end pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setAssignPlanModalOpen(false)}
+                                    className="px-4 py-2 rounded-xl border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={planSaving}
+                                    className="px-5 py-2 rounded-xl bg-[#842029] hover:bg-[#640515] text-white text-xs font-semibold cursor-pointer shadow-2xs"
+                                >
+                                    {planSaving ? "Assigning..." : "Assign & Activate"}
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}

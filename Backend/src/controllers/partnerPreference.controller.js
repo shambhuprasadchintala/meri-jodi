@@ -5,9 +5,9 @@ import profileService from "../services/profile.service.js"
 class PartnerPreferenceController extends BaseController {
     async getMyPreferences(req, res, next) {
         try {
-            const profile = await profileService.getByUserId(req.user._id)
+            let profile = await profileService.getByUserId(req.user._id)
             if (!profile) {
-                return this.sendError(res, "Profile not found", 404)
+                profile = await profileService.create(req.user._id, { name: req.user.name })
             }
 
             const preferences = await partnerPreferenceService.getByProfileId(
@@ -15,7 +15,7 @@ class PartnerPreferenceController extends BaseController {
             )
             return this.sendSuccess(
                 res,
-                preferences,
+                preferences || {},
                 "Preferences retrieved"
             )
         } catch (error) {
@@ -25,9 +25,9 @@ class PartnerPreferenceController extends BaseController {
 
     async updatePreferences(req, res, next) {
         try {
-            const profile = await profileService.getByUserId(req.user._id)
+            let profile = await profileService.getByUserId(req.user._id)
             if (!profile) {
-                return this.sendError(res, "Profile not found", 404)
+                profile = await profileService.create(req.user._id, { name: req.user.name })
             }
 
             const preferences = await partnerPreferenceService.createOrUpdate(

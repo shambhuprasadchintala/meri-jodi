@@ -20,6 +20,10 @@ const partnerPreferenceSchema = new Schema(
         religion: String,
         caste: String,
         location: String,
+        locations: {
+            type: [String],
+            default: [],
+        },
         education: String,
         occupation: String,
         annualIncome: String,
