@@ -42,7 +42,7 @@ authApi.interceptors.response.use(
                     originalRequest.headers.Authorization = `Bearer ${newToken}`
                     return authApi(originalRequest)
                 }
-            } catch (refreshErr) {
+            } catch (_refreshErr) {
                 localStorage.removeItem("token")
             }
         }
@@ -148,7 +148,7 @@ export const sendOtp = async (emailOrPhone) => {
     return unwrap(res)
 }
 
-export const verifyOtp = async (emailOrPhone, code, name) => {
+export const verifyOtp = async (emailOrPhone, code, _name) => {
     if (emailOrPhone?.includes?.("@")) {
         return verifyLoginOtp({ email: emailOrPhone, otp: code })
     }

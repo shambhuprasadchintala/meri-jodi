@@ -41,7 +41,7 @@ axiosInstance.interceptors.response.use(
           originalRequest.headers.Authorization = `Bearer ${newToken}`
           return axiosInstance(originalRequest)
         }
-      } catch (refreshErr) {
+      } catch (_refreshErr) {
         localStorage.removeItem("token")
         window.location.href = "/login"
       }

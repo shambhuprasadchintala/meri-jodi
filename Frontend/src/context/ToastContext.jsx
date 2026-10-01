@@ -34,14 +34,11 @@ export function ToastProvider({ children }) {
 export function useToast() {
     const context = useContext(ToastContext)
     if (!context) {
-        // Fallback dummy
         const noop = () => {}
-        noop.addToast = noop
-        return noop
+        return Object.assign(noop, { addToast: noop })
     }
     const fn = (message, type, duration) => context.addToast(message, type, duration)
-    fn.addToast = context.addToast
-    return fn
+    return Object.assign(fn, { addToast: context.addToast })
 }
 
 function Toast({ toast, onRemove }) {
