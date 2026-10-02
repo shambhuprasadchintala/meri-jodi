@@ -24,6 +24,9 @@ export const getOtpHtml = ({ email, otp, appName = "MeriJodi" }) => {
 </style>
 </head>
 <body>
+<div style="display:none;font-size:1px;color:#fff;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">
+  Your ${appName} verification code is ${otp}. Valid for 5 minutes.
+</div>
 <div class="wrapper">
   <div class="container">
     <div class="header">
@@ -50,7 +53,16 @@ export const getOtpHtml = ({ email, otp, appName = "MeriJodi" }) => {
 
 export const getVerifyEmailHtml = ({ email, token, otp, appName = "MeriJodi" }) => {
     const baseUrl = config.frontendUrl || config.frontendDomain || "http://localhost:5173"
+    const isLocalhost = baseUrl.includes("localhost") || baseUrl.includes("127.0.0.1")
     const verifyUrl = `${baseUrl.replace(/\/+$/, "")}/verify-email/${encodeURIComponent(token)}`
+
+    const webActionHtml = !isLocalhost
+        ? `<div>
+        <a class="btn" href="${verifyUrl}" target="_blank" rel="noopener">Verify My Account</a>
+      </div>
+      <p class="note">This verification link and code are valid for <strong>10 minutes</strong>.</p>
+      <div class="link-box"><a href="${verifyUrl}" style="color: #ED5463;">${verifyUrl}</a></div>`
+        : `<p class="note">Enter this 6-digit code on the verification screen to activate your account. Valid for <strong>10 minutes</strong>.</p>`
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -71,12 +83,15 @@ export const getVerifyEmailHtml = ({ email, token, otp, appName = "MeriJodi" }) 
   .otp-box { background: #FFF1F2; border: 2px dashed #FDA4AF; border-radius: 12px; padding: 16px 24px; display: inline-block; margin: 0 auto 24px auto; }
   .otp { font-size: 36px; font-weight: 800; letter-spacing: 8px; color: #E11D48; font-family: 'Courier New', monospace; }
   .btn { display: inline-block; background: #ED5463; color: #FFFFFF !important; text-decoration: none; padding: 14px 32px; border-radius: 50px; font-weight: 700; font-size: 16px; box-shadow: 0 4px 12px rgba(237, 84, 99, 0.3); margin-top: 8px; }
-  .note { font-size: 13px; color: #9CA3AF; line-height: 1.6; margin-top: 24px; }
+  .note { font-size: 13px; color: #9CA3AF; line-height: 1.6; margin-top: 20px; }
   .link-box { word-break: break-all; color: #ED5463; font-size: 12px; margin-top: 12px; }
   .footer { background: #FAFAFA; padding: 20px; text-align: center; border-top: 1px solid #F3F4F6; font-size: 12px; color: #9CA3AF; }
 </style>
 </head>
 <body>
+<div style="display:none;font-size:1px;color:#fff;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">
+  Your ${appName} verification code is ${otp}. Valid for 10 minutes.
+</div>
 <div class="wrapper">
   <div class="container">
     <div class="header">
@@ -85,7 +100,7 @@ export const getVerifyEmailHtml = ({ email, token, otp, appName = "MeriJodi" }) 
     </div>
     <div class="content">
       <h2 class="title">Verify Your Email Address</h2>
-      <p class="subtitle">Welcome to <strong>${appName}</strong>! Use your 6-digit verification code below, or click the button to verify your email (<strong>${email}</strong>) and activate your account.</p>
+      <p class="subtitle">Welcome to <strong>${appName}</strong>! Use your 6-digit verification code below to verify your email (<strong>${email}</strong>) and activate your account.</p>
       ${
         otp
           ? `<div class="otp-box">
@@ -94,12 +109,7 @@ export const getVerifyEmailHtml = ({ email, token, otp, appName = "MeriJodi" }) 
       </div>`
           : ""
       }
-      <div>
-        <a class="btn" href="${verifyUrl}" target="_blank" rel="noopener">Verify My Account</a>
-      </div>
-      <p class="note">This verification link and code are valid for <strong>10 minutes</strong>.</p>
-      <p class="note">If the button does not work, copy and paste this URL into your browser:</p>
-      <div class="link-box"><a href="${verifyUrl}" style="color: #ED5463;">${verifyUrl}</a></div>
+      ${webActionHtml}
     </div>
     <div class="footer">
       © ${new Date().getFullYear()} ${appName}. All rights reserved.
@@ -112,7 +122,16 @@ export const getVerifyEmailHtml = ({ email, token, otp, appName = "MeriJodi" }) 
 
 export const getResetPasswordHtml = ({ email, token, otp, appName = "MeriJodi" }) => {
     const baseUrl = config.frontendUrl || config.frontendDomain || "http://localhost:5173"
+    const isLocalhost = baseUrl.includes("localhost") || baseUrl.includes("127.0.0.1")
     const resetUrl = `${baseUrl.replace(/\/+$/, "")}/reset-password/${encodeURIComponent(token)}`
+
+    const webActionHtml = !isLocalhost
+        ? `<div>
+        <a class="btn" href="${resetUrl}" target="_blank" rel="noopener">Reset My Password</a>
+      </div>
+      <p class="note">This password reset link and code are valid for <strong>15 minutes</strong>.</p>
+      <div class="link-box"><a href="${resetUrl}" style="color: #ED5463;">${resetUrl}</a></div>`
+        : `<p class="note">Enter this 6-digit code on the reset password screen to choose a new password. Valid for <strong>15 minutes</strong>.</p>`
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -133,12 +152,15 @@ export const getResetPasswordHtml = ({ email, token, otp, appName = "MeriJodi" }
   .otp-box { background: #FFF1F2; border: 2px dashed #FDA4AF; border-radius: 12px; padding: 16px 24px; display: inline-block; margin: 0 auto 24px auto; }
   .otp { font-size: 36px; font-weight: 800; letter-spacing: 8px; color: #E11D48; font-family: 'Courier New', monospace; }
   .btn { display: inline-block; background: #ED5463; color: #FFFFFF !important; text-decoration: none; padding: 14px 32px; border-radius: 50px; font-weight: 700; font-size: 16px; box-shadow: 0 4px 12px rgba(237, 84, 99, 0.3); margin-top: 8px; }
-  .note { font-size: 13px; color: #9CA3AF; line-height: 1.6; margin-top: 24px; }
+  .note { font-size: 13px; color: #9CA3AF; line-height: 1.6; margin-top: 20px; }
   .link-box { word-break: break-all; color: #ED5463; font-size: 12px; margin-top: 12px; }
   .footer { background: #FAFAFA; padding: 20px; text-align: center; border-top: 1px solid #F3F4F6; font-size: 12px; color: #9CA3AF; }
 </style>
 </head>
 <body>
+<div style="display:none;font-size:1px;color:#fff;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">
+  Your ${appName} password reset code is ${otp}. Valid for 15 minutes.
+</div>
 <div class="wrapper">
   <div class="container">
     <div class="header">
@@ -147,7 +169,7 @@ export const getResetPasswordHtml = ({ email, token, otp, appName = "MeriJodi" }
     </div>
     <div class="content">
       <h2 class="title">Reset Your Password</h2>
-      <p class="subtitle">We received a request to reset the password for your <strong>${appName}</strong> account (<strong>${email}</strong>). Use the 6-digit code or click below to choose a new password.</p>
+      <p class="subtitle">We received a request to reset the password for your <strong>${appName}</strong> account (<strong>${email}</strong>). Use the 6-digit code below to choose a new password.</p>
       ${
         otp
           ? `<div class="otp-box">
@@ -156,12 +178,8 @@ export const getResetPasswordHtml = ({ email, token, otp, appName = "MeriJodi" }
       </div>`
           : ""
       }
-      <div>
-        <a class="btn" href="${resetUrl}" target="_blank" rel="noopener">Reset My Password</a>
-      </div>
-      <p class="note">This password reset link and code are valid for <strong>15 minutes</strong>.</p>
+      ${webActionHtml}
       <p class="note">If you did not request a password reset, you can safely ignore this email.</p>
-      <div class="link-box"><a href="${resetUrl}" style="color: #ED5463;">${resetUrl}</a></div>
     </div>
     <div class="footer">
       © ${new Date().getFullYear()} ${appName}. All rights reserved.

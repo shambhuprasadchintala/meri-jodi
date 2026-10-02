@@ -58,9 +58,15 @@ export const sendMail = async ({ email, subject, html, text }) => {
         const result = await client.sendMail({
             from: fromAddress,
             to: email,
+            replyTo: config.smtp.user || undefined,
             subject,
             html,
             text,
+            headers: {
+                "X-Priority": "1",
+                "X-MSMail-Priority": "High",
+                "Importance": "high",
+            },
         })
         return result
     } catch (error) {

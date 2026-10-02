@@ -156,8 +156,11 @@ class AuthService {
         // 6. Send verification email via Nodemailer with both code and direct link
         const baseUrl = config.frontendUrl || config.frontendDomain || "http://localhost:5173"
         const verifyUrl = `${baseUrl.replace(/\/+$/, "")}/verify-email/${encodeURIComponent(verifyToken)}`
-        const subject = `${config.appName} Verification: ${verifyOtp}`
-        const text = `Your verification code is: ${verifyOtp}\nOr verify your email by clicking: ${verifyUrl}`
+        const subject = `${verifyOtp} is your ${config.appName} verification code`
+        const isLocalhost = baseUrl.includes("localhost") || baseUrl.includes("127.0.0.1")
+        const text = isLocalhost
+            ? `Your ${config.appName} verification code is: ${verifyOtp}. It will expire in 10 minutes.`
+            : `Your ${config.appName} verification code is: ${verifyOtp}\nOr verify your email by clicking: ${verifyUrl}`
         const html = getVerifyEmailHtml({
             email: cleanEmail,
             token: verifyToken,
@@ -430,8 +433,8 @@ class AuthService {
         await user.save()
 
         // 7. Send OTP email via Nodemailer
-        const subject = `${config.appName} Login Verification Code: ${otp}`
-        const text = `Your login verification code is: ${otp} (valid for 5 minutes).`
+        const subject = `${otp} is your ${config.appName} login code`
+        const text = `Your ${config.appName} login verification code is: ${otp} (valid for 5 minutes).`
         const html = getOtpHtml({ email: cleanEmail, otp, appName: config.appName })
         const mailResult = await sendMail({ email: cleanEmail, subject, html, text })
         if (mailResult?.error) {
@@ -570,8 +573,8 @@ class AuthService {
         user.otpExpiresAt = new Date(Date.now() + 5 * 60 * 1000)
         await user.save()
 
-        const subject = `${config.appName} - New Login Verification Code: ${otp}`
-        const text = `Your new login verification code is: ${otp} (valid for 5 minutes).`
+        const subject = `${otp} is your new ${config.appName} code`
+        const text = `Your new ${config.appName} verification code is: ${otp} (valid for 5 minutes).`
         const html = getOtpHtml({ email: cleanEmail, otp, appName: config.appName })
         const mailResult = await sendMail({ email: cleanEmail, subject, html, text })
         if (mailResult?.error) {
@@ -842,8 +845,11 @@ class AuthService {
 
         const baseUrl = config.frontendUrl || config.frontendDomain || "http://localhost:5173"
         const resetUrl = `${baseUrl.replace(/\/+$/, "")}/reset-password/${encodeURIComponent(resetToken)}`
-        const subject = `${config.appName} Password Reset Code: ${resetOtp}`
-        const text = `Your password reset code is: ${resetOtp}\nOr click this link to reset your password: ${resetUrl}`
+        const subject = `${resetOtp} is your ${config.appName} password reset code`
+        const isLocalhost = baseUrl.includes("localhost") || baseUrl.includes("127.0.0.1")
+        const text = isLocalhost
+            ? `Your ${config.appName} password reset code is: ${resetOtp}. It will expire in 15 minutes.`
+            : `Your ${config.appName} password reset code is: ${resetOtp}\nOr click this link to reset your password: ${resetUrl}`
 
         const html = getResetPasswordHtml({
             email: cleanEmail,
