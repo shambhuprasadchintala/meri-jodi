@@ -9,15 +9,13 @@ export default function ForgotPasswordPage() {
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
     const [success, setSuccess] = useState(false)
-    const [devData, setDevData] = useState(null)
 
     const handleSubmit = async (e) => {
         e.preventDefault()
         setError("")
         setLoading(true)
         try {
-            const data = await forgotPassword(email.trim())
-            setDevData(data)
+            await forgotPassword(email.trim())
             setSuccess(true)
         } catch (err) {
             setError(err.response?.data?.message || "Something went wrong. Please try again.")
@@ -61,7 +59,7 @@ export default function ForgotPasswordPage() {
                             <div className="flex flex-col gap-2.5 pt-2">
                                 <button
                                     type="button"
-                                    onClick={() => navigate(`/reset-password?email=${encodeURIComponent(email)}${devData?.devOtp ? `&code=${devData.devOtp}` : ""}`)}
+                                    onClick={() => navigate(`/reset-password?email=${encodeURIComponent(email)}`)}
                                     className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl shadow-sm text-sm font-semibold text-white bg-[#640515] hover:bg-[#4a0410] transition-colors cursor-pointer"
                                 >
                                     <KeyRound size={16} /> Enter 6-Digit Code / Reset Password <ArrowRight size={16} />
@@ -77,25 +75,9 @@ export default function ForgotPasswordPage() {
                                 </a>
                             </div>
 
-                            {/* Dev Helper Banner if available */}
-                            {devData?.devOtp && (
-                                <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl text-left text-xs space-y-1.5">
-                                    <div className="flex items-center justify-between">
-                                        <span className="font-bold text-amber-900">⚡ Dev Quick Access Code:</span>
-                                        <span className="font-mono font-extrabold text-sm text-amber-950 bg-amber-200/70 px-2.5 py-0.5 rounded-lg tracking-widest">{devData.devOtp}</span>
-                                    </div>
-                                    <Link
-                                        to={`/reset-password/${devData.devToken || devData.devOtp}`}
-                                        className="text-amber-800 underline hover:text-amber-950 block font-medium"
-                                    >
-                                        Click here to reset password directly →
-                                    </Link>
-                                </div>
-                            )}
-
                             <div className="pt-3 border-t border-gray-100">
                                 <button
-                                    onClick={() => { setSuccess(false); setEmail(""); setDevData(null); }}
+                                    onClick={() => { setSuccess(false); setEmail(""); }}
                                     className="text-xs font-medium text-gray-500 hover:text-gray-800 underline cursor-pointer"
                                 >
                                     Try another email address

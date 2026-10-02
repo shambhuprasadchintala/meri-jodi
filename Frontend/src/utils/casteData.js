@@ -12,7 +12,6 @@ export const motherTongues = [
   "Odia",
   "Assamese",
   "English",
-  "Other",
 ];
 
 export const religions = [

@@ -167,11 +167,9 @@ class AuthService {
         const mailResult = await sendMail({ email: cleanEmail, subject, html, text })
         if (mailResult && mailResult.error) {
             console.error(`[Registration Email Error] SMTP delivery failed for ${cleanEmail}: ${mailResult.error}`)
-            if (config.env === "production") {
-                const err = new Error(`Failed to send verification email to your inbox: ${mailResult.error}. Please check your SMTP App Password in .env.`)
-                err.statusCode = 500
-                throw err
-            }
+            const err = new Error(`Failed to send verification email to ${cleanEmail}: ${mailResult.error}. Please check your SMTP configuration.`)
+            err.statusCode = 500
+            throw err
         }
 
         // 7. Set 5-second rate limit
@@ -179,7 +177,7 @@ class AuthService {
 
         return {
             message: "Registration successful! A verification code has been sent to your email inbox.",
-            ...(config.env !== "production" ? { verifyToken, otp: verifyOtp } : {}),
+            email: cleanEmail,
         }
     }
 
@@ -438,11 +436,9 @@ class AuthService {
         const mailResult = await sendMail({ email: cleanEmail, subject, html, text })
         if (mailResult?.error) {
             console.error(`[Login Email Error] SMTP delivery failed for ${cleanEmail}: ${mailResult.error}`)
-            if (config.env === "production") {
-                const err = new Error(`Failed to deliver verification code to your inbox (${mailResult.error}). Please check your SMTP settings in .env.`)
-                err.statusCode = 500
-                throw err
-            }
+            const err = new Error(`Failed to deliver verification code to your email (${mailResult.error}). Please check your SMTP settings.`)
+            err.statusCode = 500
+            throw err
         }
 
         // 8. Set 60s rate limit for sending next OTP
@@ -450,7 +446,7 @@ class AuthService {
 
         return {
             message: "A verification code has been sent to your email. Please check your inbox.",
-            ...(config.env !== "production" ? { otp } : {}),
+            email: cleanEmail,
         }
     }
 
@@ -580,18 +576,16 @@ class AuthService {
         const mailResult = await sendMail({ email: cleanEmail, subject, html, text })
         if (mailResult?.error) {
             console.error(`[Resend Email Error] SMTP delivery failed for ${cleanEmail}: ${mailResult.error}`)
-            if (config.env === "production") {
-                const err = new Error(`Failed to deliver new code to ${cleanEmail} (${mailResult.error}). Please check your SMTP settings in .env.`)
-                err.statusCode = 500
-                throw err
-            }
+            const err = new Error(`Failed to deliver new code to ${cleanEmail} (${mailResult.error}). Please check your SMTP settings.`)
+            err.statusCode = 500
+            throw err
         }
 
         await redisClient.set(resendKey, "true", { EX: 60 })
 
         return {
             message: "A new verification code has been sent to your email. Please check your inbox.",
-            ...(config.env !== "production" ? { otp } : {}),
+            email: cleanEmail,
         }
     }
 
@@ -858,15 +852,17 @@ class AuthService {
             appName: config.appName,
         })
         const mailResult = await sendMail({ email: cleanEmail, subject, html, text })
+        if (mailResult?.error) {
+            console.error(`[Forgot Password Email Error] SMTP delivery failed for ${cleanEmail}: ${mailResult.error}`)
+            const err = new Error(`Failed to send password reset email (${mailResult.error}).`)
+            err.statusCode = 500
+            throw err
+        }
 
         await redisClient.set(rateLimitKey, "true", { EX: 5 })
 
-        const isDev = config.env !== "production"
         return {
             message: "If an account with this email exists, a password reset link has been sent.",
-            devResetUrl: isDev ? resetUrl : undefined,
-            devToken: isDev ? resetToken : undefined,
-            devOtp: isDev ? resetOtp : undefined,
             sentTo: cleanEmail,
         }
     }

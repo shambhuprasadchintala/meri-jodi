@@ -21,7 +21,6 @@ const LoginPage = () => {
     const [password, setPassword] = useState("")
     const [showPassword, setShowPassword] = useState(false)
     const [otp, setOtp] = useState("")
-    const [devOtp, setDevOtp] = useState("")
     const [error, setError] = useState("")
     const [infoMsg, setInfoMsg] = useState("")
     const [loading, setLoading] = useState(false)

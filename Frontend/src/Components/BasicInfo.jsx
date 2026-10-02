@@ -214,7 +214,7 @@ export default function BasicInfo({
             errors.motherTongue ? "border-red-500" : "border-[#DFDFDF] hover:border-[#842029] focus:border-[#842029]"
           }`}
         >
-          <option value="">Select Mother Tongue</option>
+          <option value="" disabled hidden>Select Mother Tongue</option>
           {formData.motherTongue && !motherTongues.includes(formData.motherTongue) && (
             <option value={formData.motherTongue}>{formData.motherTongue}</option>
           )}

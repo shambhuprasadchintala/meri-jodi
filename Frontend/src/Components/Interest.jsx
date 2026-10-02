@@ -332,8 +332,9 @@ export default function Interest({
                   : "border-[#DFDFDF] hover:border-[#AE2539] focus:border-[#AE2539]"
               }`}
             >
-              <option value="">Select Mother Tongue / Language</option>
-              {formData.motherTongue && !motherTongues.includes(formData.motherTongue) && (
+              <option value="" disabled hidden>Select Mother Tongue / Language</option>
+              <option value="No Preference">Any Language / No Preference</option>
+              {formData.motherTongue && !["No Preference", ...motherTongues].includes(formData.motherTongue) && (
                 <option value={formData.motherTongue}>{formData.motherTongue}</option>
               )}
               {motherTongues.map((lang) => (
