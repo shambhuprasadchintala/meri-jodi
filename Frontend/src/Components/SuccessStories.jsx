@@ -1,6 +1,6 @@
-import SuccessStories1 from '../Assets/SuccessStories1.jpg';
-import SuccessStories2 from '../Assets/SuccessStories2.jpg';
-import img4 from '../Assets/img4.jpg';
+import SuccessStories1 from '../assets/SuccessStories1.jpg';
+import SuccessStories2 from '../assets/SuccessStories2.jpg';
+import img4 from '../assets/img4.jpg';
 
 const SuccessStories = () => {
   const stories = [
