@@ -183,10 +183,12 @@ class AuthService {
         })
         const mailResult = await sendMail({ email: cleanEmail, subject, html, text })
         if (mailResult && mailResult.error) {
-            console.error(`[Registration Email Error] SMTP delivery failed for ${cleanEmail}: ${mailResult.error}`)
-            const err = new Error(`Failed to send verification email to ${cleanEmail}: ${mailResult.error}. Please check your SMTP configuration.`)
-            err.statusCode = 500
-            throw err
+            console.warn(`[Registration Email Warning] SMTP delivery failed for ${cleanEmail}: ${mailResult.error}`)
+            if (config.env === "production") {
+                const err = new Error(`Failed to send verification email to ${cleanEmail}: ${mailResult.error}. Please check your SMTP configuration.`)
+                err.statusCode = 500
+                throw err
+            }
         }
 
         // 7. Set 5-second rate limit
@@ -455,10 +457,12 @@ class AuthService {
         const html = getOtpHtml({ email: cleanEmail, otp, appName: config.appName })
         const mailResult = await sendMail({ email: cleanEmail, subject, html, text })
         if (mailResult?.error) {
-            console.error(`[Login Email Error] SMTP delivery failed for ${cleanEmail}: ${mailResult.error}`)
-            const err = new Error(`Failed to deliver verification code to your email (${mailResult.error}). Please check your SMTP settings.`)
-            err.statusCode = 500
-            throw err
+            console.warn(`[Login Email Warning] SMTP delivery failed for ${cleanEmail}: ${mailResult.error}`)
+            if (config.env === "production") {
+                const err = new Error(`Failed to deliver verification code to your email (${mailResult.error}). Please check your SMTP settings.`)
+                err.statusCode = 500
+                throw err
+            }
         }
 
         // 8. Set 60s rate limit for sending next OTP
@@ -595,10 +599,12 @@ class AuthService {
         const html = getOtpHtml({ email: cleanEmail, otp, appName: config.appName })
         const mailResult = await sendMail({ email: cleanEmail, subject, html, text })
         if (mailResult?.error) {
-            console.error(`[Resend Email Error] SMTP delivery failed for ${cleanEmail}: ${mailResult.error}`)
-            const err = new Error(`Failed to deliver new code to ${cleanEmail} (${mailResult.error}). Please check your SMTP settings.`)
-            err.statusCode = 500
-            throw err
+            console.warn(`[Resend Email Warning] SMTP delivery failed for ${cleanEmail}: ${mailResult.error}`)
+            if (config.env === "production") {
+                const err = new Error(`Failed to deliver new code to ${cleanEmail} (${mailResult.error}). Please check your SMTP settings.`)
+                err.statusCode = 500
+                throw err
+            }
         }
 
         await redisClient.set(resendKey, "true", { EX: 60 })
@@ -876,10 +882,12 @@ class AuthService {
         })
         const mailResult = await sendMail({ email: cleanEmail, subject, html, text })
         if (mailResult?.error) {
-            console.error(`[Forgot Password Email Error] SMTP delivery failed for ${cleanEmail}: ${mailResult.error}`)
-            const err = new Error(`Failed to send password reset email (${mailResult.error}).`)
-            err.statusCode = 500
-            throw err
+            console.warn(`[Forgot Password Email Warning] SMTP delivery failed for ${cleanEmail}: ${mailResult.error}`)
+            if (config.env === "production") {
+                const err = new Error(`Failed to send password reset email (${mailResult.error}).`)
+                err.statusCode = 500
+                throw err
+            }
         }
 
         await redisClient.set(rateLimitKey, "true", { EX: 5 })

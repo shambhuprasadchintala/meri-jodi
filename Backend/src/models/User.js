@@ -67,6 +67,7 @@ userSchema.methods.toAuthJSON = function () {
         status: this.status,
         isEmailVerified: this.isEmailVerified,
         isPhoneVerified: this.isPhoneVerified,
+        googleId: this.googleId,
     }
 }
 

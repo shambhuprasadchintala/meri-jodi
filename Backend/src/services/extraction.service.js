@@ -793,42 +793,156 @@ Return ONLY valid JSON. No conversational text or markdown codeblocks outside JS
     }
 
     /**
-     * Generate bio - AI generation disabled/commented out as requested.
+     * Generate an engaging matrimonial profile bio using Gemini AI (with Groq LLM fallback)
      */
     async generateBio(details = {}) {
-        /*
-        // [AI FEATURE DISABLED] Gemini/Groq AI Bio Generation
-        if (process.env.GEMINI_API_KEY) { ... }
-        if (process.env.GROQ_API_KEY) { ... }
-        */
         const {
             name = "User",
+            gender = "",
             occupation = "",
             education = "",
             city = "",
+            location = "",
             hobbies = [],
+            religion = "",
+            maritalStatus = "",
         } = details
 
+        const userCity = city || location || "India"
         const hobbiesStr = Array.isArray(hobbies) && hobbies.length > 0
             ? hobbies.join(", ")
-            : "reading, music, and spending time with family"
+            : "reading, traveling, fitness, and family time"
 
-        return `Hello! I am ${name}, a ${occupation || "working professional"} based in ${city || "India"}${education ? ` with a degree in ${education}` : ""}. In my free time, I enjoy ${hobbiesStr}. I am looking for an understanding, kind-hearted, and like-minded partner to share life's journey with.`
+        const bioPrompt = `Write a warm, dignified, and attractive first-person matrimonial profile introduction (50 to 200 words) for an Indian matchmaking platform.
+Profile Details:
+- Name: ${name}
+- Gender: ${gender || "Not specified"}
+- Profession: ${occupation || "Professional"}
+- Education: ${education || "Graduate"}
+- Location: ${userCity}
+- Hobbies / Interests: ${hobbiesStr}
+${religion ? `- Religion / Values: ${religion}` : ""}
+${maritalStatus ? `- Marital Status: ${maritalStatus}` : ""}
+
+Instructions:
+1. Write in natural, polite first-person ("I am...", "I value...").
+2. Mention personality, professional background, lifestyle interests, and what kind of life partner is desired.
+3. Keep it between 50 and 200 words.
+4. Return ONLY the plain text bio without quotes or markdown headers.`
+
+        // Tier 1: Try Gemini
+        if (process.env.GEMINI_API_KEY) {
+            try {
+                const response = await generateWithGemini([bioPrompt])
+                if (response && response.length >= 40) {
+                    return response.replace(/^["']|["']$/g, "").trim()
+                }
+            } catch (err) {
+                console.warn("[Gemini Bio Generation Warning] Gemini failed, trying Groq:", err.message)
+            }
+        }
+
+        // Tier 2: Try Groq
+        if (process.env.GROQ_API_KEY) {
+            try {
+                const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+                    },
+                    body: JSON.stringify({
+                        model: "llama-3.3-70b-versatile",
+                        messages: [
+                            { role: "system", content: "You are an expert matrimonial profile writer." },
+                            { role: "user", content: bioPrompt },
+                        ],
+                        temperature: 0.7,
+                        max_tokens: 300,
+                    }),
+                })
+                if (groqRes.ok) {
+                    const groqData = await groqRes.json()
+                    const bioText = groqData.choices?.[0]?.message?.content?.trim()
+                    if (bioText && bioText.length >= 40) {
+                        return bioText.replace(/^["']|["']$/g, "").trim()
+                    }
+                }
+            } catch (groqErr) {
+                console.warn("[Groq Bio Generation Warning] Groq failed, using template:", groqErr.message)
+            }
+        }
+
+        // Tier 3: High-quality dynamic template fallback
+        return `Hello! I am ${name}, a ${occupation || "working professional"} based in ${userCity}${education ? ` with a background in ${education}` : ""}. I consider myself an open-minded, grounded individual with a modern outlook and respect for traditional family values. In my free time, I enjoy ${hobbiesStr}. I am looking for a kind-hearted, progressive, and understanding life partner who values mutual respect, companionship, and growing together through all stages of life.`
     }
 
     /**
-     * Generate chat suggestions - AI suggestions disabled/commented out as requested.
+     * Generate AI-powered conversation starters and icebreakers using Gemini & Groq
      */
     async generateChatSuggestions(partnerDetails = {}, lastMessage = "", category = "icebreaker") {
-        /*
-        // [AI FEATURE DISABLED] Gemini/Groq AI Chat Suggestions
-        if (process.env.GEMINI_API_KEY) { ... }
-        if (process.env.GROQ_API_KEY) { ... }
-        */
-        
         const { name = "there", occupation = "", city = "", hobbies = [] } = partnerDetails
         const firstName = name.split(" ")[0] || "there"
-        
+
+        const prompt = `Generate 4 friendly, polite, and engaging conversation starters/icebreakers for a matrimonial chat on an Indian matchmaking platform.
+Recipient Name: ${firstName}
+Recipient Occupation: ${occupation || "Not specified"}
+Recipient City: ${city || "Not specified"}
+Recipient Hobbies: ${Array.isArray(hobbies) ? hobbies.join(", ") : "Not specified"}
+Last Message Context: ${lastMessage || "Starting a fresh conversation"}
+
+Return strictly a JSON array of 4 strings (e.g. ["Suggestion 1", "Suggestion 2", "Suggestion 3", "Suggestion 4"]).`
+
+        // Tier 1: Try Gemini
+        if (process.env.GEMINI_API_KEY) {
+            try {
+                const response = await generateWithGemini([prompt], {
+                    responseMimeType: "application/json",
+                })
+                if (response) {
+                    const parsed = JSON.parse(response)
+                    if (Array.isArray(parsed) && parsed.length > 0) return parsed.slice(0, 4)
+                    if (Array.isArray(parsed.suggestions) && parsed.suggestions.length > 0) return parsed.suggestions.slice(0, 4)
+                }
+            } catch (err) {
+                console.warn("[Gemini Chat Suggestions Warning] Gemini failed, trying Groq:", err.message)
+            }
+        }
+
+        // Tier 2: Try Groq
+        if (process.env.GROQ_API_KEY) {
+            try {
+                const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+                    },
+                    body: JSON.stringify({
+                        model: "llama-3.3-70b-versatile",
+                        messages: [
+                            { role: "system", content: "You are an expert matchmaking conversation coach. Return valid JSON array of 4 starter questions." },
+                            { role: "user", content: prompt },
+                        ],
+                        temperature: 0.7,
+                        response_format: { type: "json_object" },
+                    }),
+                })
+                if (groqRes.ok) {
+                    const groqData = await groqRes.json()
+                    const raw = groqData.choices?.[0]?.message?.content?.trim()
+                    if (raw) {
+                        const parsed = JSON.parse(raw)
+                        const list = Array.isArray(parsed) ? parsed : (parsed.suggestions || parsed.starters || Object.values(parsed))
+                        if (Array.isArray(list) && list.length > 0) return list.slice(0, 4)
+                    }
+                }
+            } catch (groqErr) {
+                console.warn("[Groq Chat Suggestions Warning] Groq failed, using heuristics:", groqErr.message)
+            }
+        }
+
+        // Tier 3: Dynamic rule-based starters
         const suggestions = []
         if (lastMessage) {
             suggestions.push(`Thanks for your message, ${firstName}! That sounds really interesting. How has the rest of your week been?`)

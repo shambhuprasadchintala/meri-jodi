@@ -8,8 +8,32 @@ const startServer = async () => {
     await connectDB()
     await seedAdmin()
 
-    const PORT = config.port || 5000
-    const server = app.listen(PORT, () => console.log(`Server running on port ${PORT}`))
+    const requestedPort = Number(config.port) || 5000
+
+    const listenOnPort = (port) =>
+        new Promise((resolve, reject) => {
+            const srv = app.listen(port)
+            srv.once("listening", () => {
+                console.log(`Server running on port ${port}`)
+                resolve(srv)
+            })
+            srv.once("error", (err) => {
+                if (err.code === "EADDRINUSE" && port === requestedPort) {
+                    console.warn(`Port ${port} is in use (e.g. macOS AirPlay). Falling back to port ${port + 1}...`)
+                    srv.close?.()
+                    const fallbackSrv = app.listen(port + 1)
+                    fallbackSrv.once("listening", () => {
+                        console.log(`Server running on port ${port + 1}`)
+                        resolve(fallbackSrv)
+                    })
+                    fallbackSrv.once("error", reject)
+                } else {
+                    reject(err)
+                }
+            })
+        })
+
+    const server = await listenOnPort(requestedPort)
 
     // Attach Socket.io
     setupSocket(server)
