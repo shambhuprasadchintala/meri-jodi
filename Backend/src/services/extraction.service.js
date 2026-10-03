@@ -13,11 +13,51 @@ const getAI = () => {
 }
 
 const GEMINI_MODELS = [
-    "gemini-3.6-flash",
     "gemini-2.5-flash",
     "gemini-2.0-flash",
     "gemini-1.5-flash",
+    "gemini-1.5-pro",
+    "gemini-2.5-pro",
 ]
+
+const GROQ_MODELS = [
+    "openai/gpt-oss-120b",
+    "openai/gpt-oss-20b",
+    "qwen/qwen3.8-27b",
+    "llama-3.3-70b-versatile",
+]
+
+async function generateWithGroq(messages, jsonMode = false, temperature = 0.3) {
+    if (!process.env.GROQ_API_KEY) return null
+    for (const model of GROQ_MODELS) {
+        try {
+            const body = {
+                model,
+                messages,
+                temperature,
+            }
+            if (jsonMode) {
+                body.response_format = { type: "json_object" }
+            }
+            const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+                },
+                body: JSON.stringify(body),
+            })
+            if (res.ok) {
+                const data = await res.json()
+                const content = data.choices?.[0]?.message?.content?.trim()
+                if (content) return { model, content }
+            }
+        } catch (err) {
+            console.warn(`[Groq] Model ${model} failed, trying next:`, err.message || err)
+        }
+    }
+    return null
+}
 
 async function generateWithGemini(contents, config = {}) {
     const ai = getAI()
@@ -726,46 +766,31 @@ Return ONLY valid JSON. No conversational text or markdown codeblocks outside JS
             }
         }
 
-        // Tier 3: Try Groq LLM fallback with extracted text or text representation
+        // Tier 3: Try Groq LLM (120B/20B/Qwen models) with extracted text or text representation
         if (process.env.GROQ_API_KEY && (pdfText || !isPdf)) {
             try {
                 const textToProcess = pdfText || fileBuffer.toString("utf-8", 0, Math.min(fileBuffer.length, 10000))
-                if (textToProcess && textToProcess.length > 20) {
-                    const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/json",
-                            Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+                if (textToProcess && textToProcess.length > 10) {
+                    const groqRes = await generateWithGroq([
+                        {
+                            role: "system",
+                            content: "You are an expert AI parser for Indian matrimonial biodatas. Return strictly valid JSON matching the user schema.",
                         },
-                        body: JSON.stringify({
-                            model: "llama-3.3-70b-versatile",
-                            messages: [
-                                {
-                                    role: "system",
-                                    content: "You are an expert AI parser for Indian matrimonial biodatas. Return strictly valid JSON matching the user's schema.",
-                                },
-                                {
-                                    role: "user",
-                                    content: `${extractionPrompt}\n\nBiodata Text Content:\n${textToProcess}`,
-                                },
-                            ],
-                            temperature: 0.2,
-                            response_format: { type: "json_object" },
-                        }),
-                    })
+                        {
+                            role: "user",
+                            content: `${extractionPrompt}\n\nBiodata Content:\n${textToProcess}`,
+                        },
+                    ], true, 0.1)
 
-                    if (groqRes.ok) {
-                        const groqData = await groqRes.json()
-                        let rawJson = groqData.choices?.[0]?.message?.content?.trim() || ""
-                        if (rawJson) {
-                            if (rawJson.startsWith("```json")) {
-                                rawJson = rawJson.replace(/^```json\s*/, "").replace(/\s*```$/, "")
-                            } else if (rawJson.startsWith("```")) {
-                                rawJson = rawJson.replace(/^```\s*/, "").replace(/\s*```$/, "")
-                            }
-                            const parsed = JSON.parse(rawJson)
-                            return normalizeBiodataResult(parsed)
+                    if (groqRes && groqRes.content) {
+                        let rawJson = groqRes.content.trim()
+                        if (rawJson.startsWith("```json")) {
+                            rawJson = rawJson.replace(/^```json\s*/, "").replace(/\s*```$/, "")
+                        } else if (rawJson.startsWith("```")) {
+                            rawJson = rawJson.replace(/^```\s*/, "").replace(/\s*```$/, "")
                         }
+                        const parsed = JSON.parse(rawJson)
+                        return normalizeBiodataResult(parsed)
                     }
                 }
             } catch (groqErr) {
@@ -842,31 +867,15 @@ Instructions:
             }
         }
 
-        // Tier 2: Try Groq
+        // Tier 2: Try Groq (120B / 20B / Qwen LLMs)
         if (process.env.GROQ_API_KEY) {
             try {
-                const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-                    },
-                    body: JSON.stringify({
-                        model: "llama-3.3-70b-versatile",
-                        messages: [
-                            { role: "system", content: "You are an expert matrimonial profile writer." },
-                            { role: "user", content: bioPrompt },
-                        ],
-                        temperature: 0.7,
-                        max_tokens: 300,
-                    }),
-                })
-                if (groqRes.ok) {
-                    const groqData = await groqRes.json()
-                    const bioText = groqData.choices?.[0]?.message?.content?.trim()
-                    if (bioText && bioText.length >= 40) {
-                        return bioText.replace(/^["']|["']$/g, "").trim()
-                    }
+                const groqRes = await generateWithGroq([
+                    { role: "system", content: "You are an expert matrimonial profile writer." },
+                    { role: "user", content: bioPrompt },
+                ], false, 0.7)
+                if (groqRes && groqRes.content && groqRes.content.length >= 40) {
+                    return groqRes.content.replace(/^["']|["']$/g, "").trim()
                 }
             } catch (groqErr) {
                 console.warn("[Groq Bio Generation Warning] Groq failed, using template:", groqErr.message)
@@ -891,7 +900,7 @@ Recipient City: ${city || "Not specified"}
 Recipient Hobbies: ${Array.isArray(hobbies) ? hobbies.join(", ") : "Not specified"}
 Last Message Context: ${lastMessage || "Starting a fresh conversation"}
 
-Return strictly a JSON array of 4 strings (e.g. ["Suggestion 1", "Suggestion 2", "Suggestion 3", "Suggestion 4"]).`
+Return strictly a JSON object with a "suggestions" array containing 4 strings (e.g. {"suggestions": ["Suggestion 1", "Suggestion 2", "Suggestion 3", "Suggestion 4"]}).`
 
         // Tier 1: Try Gemini
         if (process.env.GEMINI_API_KEY) {
@@ -909,33 +918,20 @@ Return strictly a JSON array of 4 strings (e.g. ["Suggestion 1", "Suggestion 2",
             }
         }
 
-        // Tier 2: Try Groq
+        // Tier 2: Try Groq (120B / 20B / Qwen LLMs)
         if (process.env.GROQ_API_KEY) {
             try {
-                const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-                    },
-                    body: JSON.stringify({
-                        model: "llama-3.3-70b-versatile",
-                        messages: [
-                            { role: "system", content: "You are an expert matchmaking conversation coach. Return valid JSON array of 4 starter questions." },
-                            { role: "user", content: prompt },
-                        ],
-                        temperature: 0.7,
-                        response_format: { type: "json_object" },
-                    }),
-                })
-                if (groqRes.ok) {
-                    const groqData = await groqRes.json()
-                    const raw = groqData.choices?.[0]?.message?.content?.trim()
-                    if (raw) {
-                        const parsed = JSON.parse(raw)
-                        const list = Array.isArray(parsed) ? parsed : (parsed.suggestions || parsed.starters || Object.values(parsed))
-                        if (Array.isArray(list) && list.length > 0) return list.slice(0, 4)
-                    }
+                const groqRes = await generateWithGroq([
+                    { role: "system", content: "You are an expert matchmaking conversation coach. Return a JSON object with a 'suggestions' array containing 4 starter questions." },
+                    { role: "user", content: prompt },
+                ], true, 0.7)
+                if (groqRes && groqRes.content) {
+                    let raw = groqRes.content.trim()
+                    if (raw.startsWith("```json")) raw = raw.replace(/^```json\s*/, "").replace(/\s*```$/, "")
+                    else if (raw.startsWith("```")) raw = raw.replace(/^```\s*/, "").replace(/\s*```$/, "")
+                    const parsed = JSON.parse(raw)
+                    const list = Array.isArray(parsed) ? parsed : (parsed.suggestions || parsed.starters || Object.values(parsed))
+                    if (Array.isArray(list) && list.length > 0) return list.slice(0, 4)
                 }
             } catch (groqErr) {
                 console.warn("[Groq Chat Suggestions Warning] Groq failed, using heuristics:", groqErr.message)

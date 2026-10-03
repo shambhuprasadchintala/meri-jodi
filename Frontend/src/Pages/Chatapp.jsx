@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
-import { Search, Send, ArrowLeft, User, ShieldCheck, CheckCheck, Clock, ExternalLink } from 'lucide-react'
+import { Search, Send, ArrowLeft, User, ShieldCheck, CheckCheck, Clock, ExternalLink, Sparkles } from 'lucide-react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { io } from 'socket.io-client'
 import Navbar from '../Components/Navbar'
-import { getConversations, getConversationHistory } from '../api/messageApi'
+import { getConversations, getConversationHistory, getChatSuggestions } from '../api/messageApi'
 import { getProfileById } from '../api/matchingApi'
 import { getMyProfile } from '../api/profileApi'
 import { formatMaskedSurname } from '../utils/formatters'
@@ -23,6 +23,8 @@ export default function Chatapp() {
   const [socket, setSocket] = useState(null)
   const [typingProfiles, setTypingProfiles] = useState({})
   const [myProfileId, setMyProfileId] = useState(null)
+  const [suggestions, setSuggestions] = useState([])
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false)
   const messagesContainerRef = useRef(null)
   const typingTimeoutRef = useRef(null)
   const messageInputRef = useRef(null)
@@ -223,6 +225,27 @@ export default function Chatapp() {
     return primary || first || conv.partnerAvatar || conv.partner?.avatar || null
   }
 
+  const fetchSuggestions = async () => {
+    if (!activeChat) return
+    setLoadingSuggestions(true)
+    try {
+      const partnerName = getChatPartnerName()
+      const partnerData = {
+        name: partnerName,
+        occupation: activeProfile?.occupation || activeProfile?.rawOccupation || '',
+        city: activeProfile?.location?.city || activeProfile?.city || '',
+        hobbies: activeProfile?.hobbies || [],
+      }
+      const lastMsg = messages.length > 0 ? messages[messages.length - 1]?.content : ''
+      const data = await getChatSuggestions(partnerData, lastMsg)
+      setSuggestions(Array.isArray(data) ? data : [])
+    } catch (e) {
+      console.warn('Failed to load chat suggestions:', e)
+    } finally {
+      setLoadingSuggestions(false)
+    }
+  }
+
   return (
     <div className="h-screen w-screen flex flex-col bg-[#FBF9F9] overflow-hidden font-sans">
       <Navbar />
@@ -419,6 +442,50 @@ export default function Chatapp() {
                         </div>
                       )
                     })
+                  )}
+                </div>
+
+                {/* AI Icebreaker Suggestions Bar */}
+                <div className="px-3 sm:px-4 py-2 border-t border-rose-100 bg-[#FFF9FA]">
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-[#842029]">
+                      <Sparkles size={14} className="text-[#ED5463]" />
+                      <span>AI Conversation Starters</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={fetchSuggestions}
+                      disabled={loadingSuggestions}
+                      className="text-[11px] text-[#842029] hover:underline font-medium flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                    >
+                      {loadingSuggestions ? 'Generating...' : suggestions.length > 0 ? '↻ Refresh AI' : '✨ Get AI Suggestions'}
+                    </button>
+                  </div>
+                  {loadingSuggestions ? (
+                    <div className="flex items-center gap-2 py-1 text-xs text-gray-400">
+                      <span className="animate-spin text-xs">✨</span> Generating personalized suggestions...
+                    </div>
+                  ) : suggestions.length > 0 ? (
+                    <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
+                      {suggestions.map((sug, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => {
+                            setNewMessage(sug)
+                            messageInputRef.current?.focus()
+                          }}
+                          className="shrink-0 max-w-[280px] truncate text-left text-xs bg-white hover:bg-rose-50 border border-rose-200 hover:border-[#842029] text-gray-700 hover:text-[#842029] px-3 py-1.5 rounded-full transition-all cursor-pointer shadow-2xs"
+                          title={sug}
+                        >
+                          {sug}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-gray-400">
+                      Click <strong className="text-[#842029] cursor-pointer hover:underline" onClick={fetchSuggestions}>"Get AI Suggestions"</strong> to generate context-aware openers based on {getChatPartnerName()}'s profile.
+                    </p>
                   )}
                 </div>
 
