@@ -6,6 +6,7 @@ import { config } from "./config/config.js"
 import routes from "./routes/index.js"
 import authRoutes from "./routes/auth.routes.js"
 import healthRoutes from "./routes/health.routes.js"
+import extractionRoutes from "./routes/extraction.routes.js"
 import errorHandler from "./middlewares/errorHandler.js"
 import configureLogger from "./middlewares/logger.js"
 import { configureSecurity } from "./middlewares/security.js"
@@ -53,6 +54,10 @@ const setupApp = () => {
     // Health check (public)
     app.use("/api/health", healthRoutes)
     app.use("/api/v1/health", healthRoutes)
+
+    // Extraction & AI routes (accessible during onboarding and for authenticated members)
+    app.use("/api/extraction", extractionRoutes)
+    app.use("/api/v1/extraction", extractionRoutes)
 
     // All routes below require auth
     app.use(authenticate)
