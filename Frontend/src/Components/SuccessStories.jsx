@@ -3,7 +3,6 @@ import SuccessStories2 from '../Assets/SuccessStories2.jpg';
 import img4 from '../Assets/img4.jpg';
 
 const SuccessStories = () => {
-  // Array of 10 mock success stories (Replace paths with your actual images)
   const stories = [
     {
       id: 1,
