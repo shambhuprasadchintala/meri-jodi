@@ -107,6 +107,13 @@ class AuthService {
      */
     async registerUser({ name, email, password, phone, gender, location, reqIp = "127.0.0.1" }) {
         const cleanEmail = email.toLowerCase().trim()
+        const cleanPhone = phone ? phone.trim() : ""
+
+        if (!cleanPhone) {
+            const error = new Error("Phone number is required.")
+            error.statusCode = 400
+            throw error
+        }
 
         // 1. Rate limiting via Redis (relaxed to 5s to avoid locking users out on retries)
         const rateLimitKey = `register-rate-limit:${reqIp}:${cleanEmail}`
@@ -116,10 +123,17 @@ class AuthService {
             throw error
         }
 
-        // 2. Check if user already exists
+        // 2. Check if user already exists with this email or phone
         const existingUser = await User.findOne({ email: cleanEmail })
         if (existingUser && existingUser.isEmailVerified) {
             const error = new Error("An account with this email already exists. Please log in.")
+            error.statusCode = 400
+            throw error
+        }
+
+        const existingPhoneUser = await User.findOne({ phone: cleanPhone })
+        if (existingPhoneUser && (existingPhoneUser.isEmailVerified || existingPhoneUser.isPhoneVerified)) {
+            const error = new Error("An account with this phone number already exists.")
             error.statusCode = 400
             throw error
         }
@@ -141,7 +155,7 @@ class AuthService {
             name: name.trim(),
             email: cleanEmail,
             passwordHash,
-            phone: phone ? phone.trim() : undefined,
+            phone: cleanPhone,
             gender: cleanGender || "female",
             location: cleanLocation,
             otp: verifyOtp,
@@ -264,7 +278,9 @@ class AuthService {
             if (phoneToSet) {
                 const phoneInUse = await User.findOne({ phone: phoneToSet })
                 if (phoneInUse) {
-                    phoneToSet = undefined
+                    const error = new Error("Phone number is already associated with another account.")
+                    error.statusCode = 400
+                    throw error
                 }
             }
 
@@ -296,6 +312,7 @@ class AuthService {
             user.isEmailVerified = true
             user.lastLogin = new Date()
             if (userData.passwordHash) user.passwordHash = userData.passwordHash
+            if (userData.phone) user.phone = userData.phone
             if (userData.gender) user.gender = userData.gender
             if (userData.location) user.location = userData.location
             await user.save()

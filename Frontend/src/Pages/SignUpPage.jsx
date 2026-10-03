@@ -50,8 +50,14 @@ const SignUpPage = () => {
         setError("")
         setSuccessMsg("")
 
-        if (!name.trim() || !email.trim() || !password) {
+        if (!name.trim() || !email.trim() || !password || !phone.trim()) {
             setError("Please fill in all required fields.")
+            return
+        }
+
+        const cleanPhone = phone.trim()
+        if (cleanPhone.length < 10) {
+            setError("Please enter a valid 10-digit mobile number.")
             return
         }
 
@@ -62,13 +68,14 @@ const SignUpPage = () => {
 
         setLoading(true)
         try {
+            const formattedPhone = cleanPhone.startsWith("+") ? cleanPhone : `+91${cleanPhone}`
             const data = await registerUser({
                 name: name.trim(),
                 email: email.trim(),
                 password,
                 gender,
                 location: locationCity.trim() || undefined,
-                phone: phone.trim() ? (phone.startsWith("+") ? phone.trim() : `+91${phone.trim()}`) : undefined,
+                phone: formattedPhone,
             })
             setOtpInput("")
             setSuccessMsg(
@@ -355,14 +362,15 @@ const SignUpPage = () => {
 
                                 <div>
                                     <label className="block text-xs font-semibold text-gray-700 mb-1 uppercase tracking-wider">
-                                        Mobile (Optional)
+                                        Mobile Number *
                                     </label>
                                     <input
-                                        type="text"
+                                        type="tel"
                                         placeholder="9876543210"
                                         value={phone}
                                         onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
                                         maxLength={10}
+                                        required
                                         className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm focus:border-[#ED5463] focus:ring-2 focus:ring-[#ED5463]/20 focus:outline-none transition-all"
                                     />
                                 </div>

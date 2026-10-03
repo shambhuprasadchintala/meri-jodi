@@ -18,6 +18,12 @@ const userSchema = new Schema(
             unique: true,
             sparse: true,
             trim: true,
+            required: [
+                function () {
+                    return !this.googleId
+                },
+                "Phone number is required",
+            ],
         },
         passwordHash: { type: String },
         googleId: { type: String, unique: true, sparse: true },
