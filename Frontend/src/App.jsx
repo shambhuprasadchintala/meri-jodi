@@ -21,7 +21,7 @@ import HomePage from "./Pages/HomePage.jsx";
 import ShortlistPage from "./Pages/ShortlistPage.jsx";
 import NotificationsPage from "./Pages/NotificationsPage.jsx";
 import SettingsPage from "./Pages/SettingsPage.jsx";
-import AdminDashboard from "./Pages/AdminDashboard.jsx";
+import { AdminApp, AdminLogin, AdminProtectedRoute } from "./Admin";
 import NotFoundPage from "./Pages/NotFoundPage.jsx";
 import ErrorBoundary from "./Components/ErrorBoundary.jsx";
 import { ToastProvider } from "./context/ToastContext.jsx";
@@ -152,12 +152,26 @@ function App() {
               </ProtectedRoute>
             }
           />
+          {/* Admin Routes with Isolated Authentication */}
+          <Route path="/admin/login" element={<AdminLogin />} />
           <Route
             path="/admin"
             element={
-              <ProtectedRoute adminOnly>
-                <AdminDashboard />
-              </ProtectedRoute>
+              <AdminProtectedRoute>
+                <AdminApp />
+              </AdminProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/dashboard"
+            element={<Navigate to="/admin" replace />}
+          />
+          <Route
+            path="/admin/*"
+            element={
+              <AdminProtectedRoute>
+                <AdminApp />
+              </AdminProtectedRoute>
             }
           />
           <Route

@@ -41,12 +41,17 @@ import {
   Server,
   DollarSign,
   Award,
-  Plus
+  Plus,
 } from "lucide-react"
+import { useNavigate, Navigate } from "react-router-dom"
 
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:5001/api"
+import "./Admin.css"
 
-export default function App() {
+const RAW_API = (typeof import.meta !== "undefined" && (import.meta.env?.VITE_API_BASE_URL || import.meta.env?.VITE_API_BASE)) || "http://localhost:5001/api/v1"
+const API_BASE = RAW_API.replace(/\/v1\/?$/, "").replace(/\/+$/, "")
+
+export default function AdminApp() {
+  const navigate = useNavigate()
   const [token, setToken] = useState(() => localStorage.getItem("admin_token") || "")
   const [adminUser, setAdminUser] = useState(() => {
     try {
@@ -223,13 +228,16 @@ export default function App() {
     setUsersList([])
     setVerifications([])
     setReports([])
-    showToast("Signed out successfully", "info")
+    navigate("/admin/login", { replace: true })
   }
 
   // Centralized authenticated fetch handler with automatic session expiration detection
   const authFetch = useCallback(async (url, options = {}) => {
     const currentToken = token || localStorage.getItem("admin_token")
-    if (!currentToken) return null
+    if (!currentToken) {
+      navigate("/admin/login", { replace: true })
+      return null
+    }
     try {
       const headers = {
         Authorization: `Bearer ${currentToken}`,
@@ -250,8 +258,7 @@ export default function App() {
         setUsersList([])
         setVerifications([])
         setReports([])
-        setLoginError("Your admin session has expired. Please sign in again.")
-        showToast("Session expired. Please sign in again.", "danger")
+        navigate("/admin/login", { replace: true })
         return null
       }
 
@@ -726,89 +733,9 @@ export default function App() {
     }
   }
 
-  // Render Sign In Screen if not authenticated
+  // If not authenticated, redirect to dedicated Admin Login page
   if (!token) {
-    return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#FAF8F5", padding: "1.5rem" }}>
-        <div style={{ background: "#ffffff", maxWidth: "420px", width: "100%", borderRadius: "24px", padding: "2.5rem", border: "1px solid #FFE4E8", boxShadow: "0 10px 25px -5px rgba(0,0,0,0.05)" }}>
-          <div style={{ textAlign: "center", marginBottom: "2rem" }}>
-            <div style={{ width: "56px", height: "56px", borderRadius: "50%", background: "#FFF0F2", color: "#842029", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 1rem" }}>
-              <ShieldCheck size={28} />
-            </div>
-            <h1 className="font-serif" style={{ fontSize: "1.75rem", fontWeight: "bold", color: "#640515" }}>
-              MeriJodi Admin
-            </h1>
-            <p style={{ fontSize: "0.875rem", color: "#6B7280", marginTop: "0.25rem" }}>
-              Trust &amp; Safety Portal Access
-            </p>
-          </div>
-
-          {loginError && (
-            <div style={{ padding: "0.75rem 1rem", background: "#FEF2F2", border: "1px solid #FECACA", color: "#991B1B", borderRadius: "12px", fontSize: "0.8125rem", marginBottom: "1.25rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-              <AlertTriangle size={16} /> {loginError}
-            </div>
-          )}
-
-          <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-            <div>
-              <label className="form-label">Admin Email</label>
-              <input
-                type="email"
-                required
-                placeholder="admin@merijodi.com"
-                value={loginEmail}
-                onChange={(e) => setLoginEmail(e.target.value)}
-                className="form-input"
-              />
-            </div>
-
-            <div>
-              <label className="form-label">Password</label>
-              <div style={{ position: "relative" }}>
-                <input
-                  type={showAdminLoginPassword ? "text" : "password"}
-                  required
-                  placeholder="••••••••"
-                  value={loginPassword}
-                  onChange={(e) => setLoginPassword(e.target.value)}
-                  className="form-input"
-                  style={{ paddingRight: "2.75rem" }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowAdminLoginPassword(!showAdminLoginPassword)}
-                  style={{
-                    position: "absolute",
-                    right: "0.75rem",
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    background: "none",
-                    border: "none",
-                    color: "#9CA3AF",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    padding: 0,
-                  }}
-                  aria-label={showAdminLoginPassword ? "Hide password" : "Show password"}
-                >
-                  {showAdminLoginPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loginLoading}
-              className="btn btn-primary"
-              style={{ padding: "0.875rem", fontSize: "0.9375rem", marginTop: "0.5rem", width: "100%" }}
-            >
-              {loginLoading ? "Authenticating..." : "Sign In to Admin Console"}
-            </button>
-          </form>
-        </div>
-      </div>
-    )
+    return <Navigate to="/admin/login" replace />
   }
 
   // Derived counts
@@ -818,7 +745,8 @@ export default function App() {
   const pendingReportsCount = stats?.counts?.pendingReports ?? reports.filter((r) => r.status === "pending").length
 
   return (
-    <div className="admin-container">
+    <div className="admin-wrapper">
+      <div className="admin-container">
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
         <div
@@ -2644,6 +2572,7 @@ export default function App() {
           <span>{toast.message}</span>
         </div>
       )}
+      </div>
     </div>
   )
 }

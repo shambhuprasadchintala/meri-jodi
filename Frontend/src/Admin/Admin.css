@@ -1,6 +1,29 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@700&display=swap');
 
 :root {
+  --admin-primary: #842029;
+  --admin-primary-hover: #6b1b27;
+  --admin-primary-light: #FFF0F2;
+  --admin-primary-border: #FFE4E8;
+  --admin-bg-main: #FBF9F9;
+  --admin-card-bg: #FFFFFF;
+  --admin-text-dark: #1F2937;
+  --admin-text-muted: #6B7280;
+  --admin-success: #10B981;
+  --admin-success-bg: #ECFDF5;
+  --admin-warning: #F59E0B;
+  --admin-warning-bg: #FFFBEB;
+  --admin-danger: #EF4444;
+  --admin-danger-bg: #FEF2F2;
+  --admin-border-color: #E5E7EB;
+  --admin-radius-sm: 8px;
+  --admin-radius-md: 14px;
+  --admin-radius-lg: 20px;
+  --admin-radius-xl: 28px;
+  --admin-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --admin-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
+  --admin-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.03);
+  /* Fallback aliases */
   --primary: #842029;
   --primary-hover: #6b1b27;
   --primary-light: #FFF0F2;
@@ -25,38 +48,21 @@
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.03);
 }
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-body {
+.admin-wrapper {
   font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-  background-color: var(--bg-main);
-  color: var(--text-dark);
+  background-color: var(--admin-bg-main);
+  color: var(--admin-text-dark);
   line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+  width: 100%;
 }
 
-.font-serif {
+.admin-wrapper * {
+  box-sizing: border-box;
+}
+
+.admin-wrapper .font-serif {
   font-family: 'Playfair Display', Georgia, serif;
-}
-
-/* Custom Scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: #D1D5DB;
-  border-radius: 9999px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #9CA3AF;
 }
 
 /* Layout Utilities */
@@ -166,14 +172,14 @@ body {
   overflow-x: auto;
 }
 
-table {
+.admin-wrapper table {
   width: 100%;
   border-collapse: collapse;
   text-align: left;
   font-size: 0.875rem;
 }
 
-th {
+.admin-wrapper th {
   background: #FFF9FA;
   padding: 0.875rem 1.25rem;
   font-weight: 600;
@@ -182,17 +188,17 @@ th {
   white-space: nowrap;
 }
 
-td {
+.admin-wrapper td {
   padding: 1rem 1.25rem;
   border-bottom: 1px solid #F3F4F6;
   color: var(--text-dark);
 }
 
-tr:last-child td {
+.admin-wrapper tr:last-child td {
   border-bottom: none;
 }
 
-tr:hover td {
+.admin-wrapper tr:hover td {
   background-color: #FFFDFD;
 }
 
@@ -333,7 +339,7 @@ tr:hover td {
   font-size: 0.75rem;
 }
 
-/* Profile Dossier & Figma Design System Styles */
+/* Profile Dossier & Design System Styles */
 .profile-header-card {
   background: #ffffff;
   border: 1px solid var(--primary-border);
