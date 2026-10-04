@@ -2,9 +2,7 @@ import { useState, useEffect } from "react"
 import { useNavigate, useLocation, Link } from "react-router-dom"
 import { ShieldCheck, Lock, Mail, Eye, EyeOff, AlertTriangle, ArrowLeft, CheckCircle } from "lucide-react"
 import "./Admin.css"
-
-const RAW_API = (typeof import.meta !== "undefined" && (import.meta.env?.VITE_API_BASE_URL || import.meta.env?.VITE_API_BASE)) || "http://localhost:5001/api/v1"
-const API_BASE = RAW_API.replace(/\/v1\/?$/, "").replace(/\/+$/, "")
+import { AUTH_BASE_URL, API_TIMEOUT_MS } from "../api/apiConfig"
 
 export default function AdminLogin() {
   const navigate = useNavigate()
@@ -46,10 +44,11 @@ export default function AdminLogin() {
     }
 
     try {
-      let res = await fetch(`${API_BASE}/auth/admin-login`, {
+      let res = await fetch(`${AUTH_BASE_URL}/admin-login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: cleanEmail, password: cleanPassword }),
+        signal: AbortSignal.timeout(API_TIMEOUT_MS),
       })
       let data = await res.json()
 

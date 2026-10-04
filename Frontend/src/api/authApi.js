@@ -1,15 +1,13 @@
 import axios from "axios"
-
-const BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api/v1"
-const AUTH_BASE = BASE.replace(/\/api\/v1\/?$/, "/api/auth")
+import { AUTH_BASE_URL, API_TIMEOUT_MS } from "./apiConfig"
 
 const unwrap = (response) => response.data?.data ?? response.data
 
 const getToken = () => localStorage.getItem("token")
 
 export const authApi = axios.create({
-    baseURL: AUTH_BASE,
-    timeout: 20000,
+    baseURL: AUTH_BASE_URL,
+    timeout: API_TIMEOUT_MS,
     withCredentials: true,
 })
 

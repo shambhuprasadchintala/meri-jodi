@@ -7,6 +7,7 @@ import { getConversations, getConversationHistory, getChatSuggestions } from '..
 import { getProfileById } from '../api/matchingApi'
 import { getMyProfile } from '../api/profileApi'
 import { formatMaskedSurname } from '../utils/formatters'
+import { SOCKET_URL } from '../api/apiConfig'
 
 export default function Chatapp() {
   const navigate = useNavigate()
@@ -79,10 +80,6 @@ export default function Chatapp() {
   useEffect(() => {
     const token = localStorage.getItem('accessToken') || localStorage.getItem('token')
     if (!token) return
-
-    const SOCKET_URL = import.meta.env.VITE_API_BASE_URL
-      ? import.meta.env.VITE_API_BASE_URL.replace('/api/v1', '')
-      : 'http://localhost:5000'
 
     const s = io(SOCKET_URL, {
       auth: { token },

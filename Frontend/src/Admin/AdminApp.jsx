@@ -46,9 +46,7 @@ import {
 import { useNavigate, Navigate } from "react-router-dom"
 
 import "./Admin.css"
-
-const RAW_API = (typeof import.meta !== "undefined" && (import.meta.env?.VITE_API_BASE_URL || import.meta.env?.VITE_API_BASE)) || "http://localhost:5001/api/v1"
-const API_BASE = RAW_API.replace(/\/v1\/?$/, "").replace(/\/+$/, "")
+import { API_BASE_URL, AUTH_BASE_URL, API_TIMEOUT_MS } from "../api/apiConfig"
 
 export default function AdminApp() {
   const navigate = useNavigate()
@@ -187,18 +185,20 @@ export default function AdminApp() {
     setLoginError("")
     setLoginLoading(true)
     try {
-      let res = await fetch(`${API_BASE}/auth/admin-login`, {
+      let res = await fetch(`${AUTH_BASE_URL}/admin-login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: loginEmail.trim(), password: loginPassword }),
+        signal: AbortSignal.timeout(API_TIMEOUT_MS),
       })
       let data = await res.json()
 
       if (!res.ok && res.status !== 401 && res.status !== 403) {
-        res = await fetch(`${API_BASE}/auth/login`, {
+        res = await fetch(`${AUTH_BASE_URL}/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email: loginEmail.trim(), password: loginPassword }),
+          signal: AbortSignal.timeout(API_TIMEOUT_MS),
         })
         data = await res.json()
       }
@@ -246,7 +246,7 @@ export default function AdminApp() {
       if (options.body && typeof options.body === "string" && !headers["Content-Type"]) {
         headers["Content-Type"] = "application/json"
       }
-      const res = await fetch(url, { ...options, headers })
+      const res = await fetch(url, { ...options, headers, signal: options.signal || AbortSignal.timeout(API_TIMEOUT_MS) })
       const json = await res.json().catch(() => ({}))
 
       if (res.status === 401 || res.status === 403) {
@@ -271,7 +271,7 @@ export default function AdminApp() {
 
   // Fetch Dashboard Stats & Overview
   const fetchStats = useCallback(async () => {
-    const result = await authFetch(`${API_BASE}/v1/admin/stats`)
+    const result = await authFetch(`${API_BASE_URL}/admin/stats`)
     if (result && result.ok) {
       setStats(result.data)
     }
@@ -281,7 +281,7 @@ export default function AdminApp() {
   const fetchVerifications = useCallback(async () => {
     setLoadingData(true)
     try {
-      const result = await authFetch(`${API_BASE}/v1/admin/verifications?limit=100`)
+      const result = await authFetch(`${API_BASE_URL}/admin/verifications?limit=100`)
       if (result && result.ok) {
         setVerifications(result.data?.verifications || (Array.isArray(result.data) ? result.data : []))
       }
@@ -294,7 +294,7 @@ export default function AdminApp() {
   const fetchReports = useCallback(async () => {
     setLoadingData(true)
     try {
-      const result = await authFetch(`${API_BASE}/v1/admin/reports?limit=100`)
+      const result = await authFetch(`${API_BASE_URL}/admin/reports?limit=100`)
       if (result && result.ok) {
         setReports(result.data?.reports || (Array.isArray(result.data) ? result.data : []))
       }
@@ -314,7 +314,7 @@ export default function AdminApp() {
       if (userVerifiedFilter !== "all") params.append("isVerified", userVerifiedFilter)
       if (debouncedSearch.trim()) params.append("search", debouncedSearch.trim())
 
-      const result = await authFetch(`${API_BASE}/v1/admin/users?${params.toString()}`)
+      const result = await authFetch(`${API_BASE_URL}/admin/users?${params.toString()}`)
       if (result && result.ok) {
         setUsersList(result.data?.users || (Array.isArray(result.data) ? result.data : []))
       }
@@ -338,7 +338,7 @@ export default function AdminApp() {
   const fetchUserDetail = useCallback(async (userId) => {
     setLoadingUserDetail(true)
     try {
-      const result = await authFetch(`${API_BASE}/v1/admin/users/${userId}`)
+      const result = await authFetch(`${API_BASE_URL}/admin/users/${userId}`)
       if (result && result.ok) {
         setSelectedUserDetail(result.data)
       } else if (result) {
@@ -359,7 +359,7 @@ export default function AdminApp() {
 
   // Fetch Admin Settings Profile
   const fetchAdminProfile = useCallback(async () => {
-    const result = await authFetch(`${API_BASE}/v1/admin/settings/profile`)
+    const result = await authFetch(`${API_BASE_URL}/admin/settings/profile`)
     if (result && result.ok) {
       const u = result.data
       setSettingsPersonalForm({
@@ -407,7 +407,7 @@ export default function AdminApp() {
     if (!selectedVerification) return
     setActionLoading(true)
     try {
-      const result = await authFetch(`${API_BASE}/v1/admin/verifications/${selectedVerification._id}/review`, {
+      const result = await authFetch(`${API_BASE_URL}/admin/verifications/${selectedVerification._id}/review`, {
         method: "PUT",
         body: JSON.stringify({ status, reviewNote: actionNote.trim() || undefined }),
       })
@@ -429,7 +429,7 @@ export default function AdminApp() {
     if (!selectedReport) return
     setActionLoading(true)
     try {
-      const result = await authFetch(`${API_BASE}/v1/admin/reports/${selectedReport._id}/status`, {
+      const result = await authFetch(`${API_BASE_URL}/admin/reports/${selectedReport._id}/status`, {
         method: "PUT",
         body: JSON.stringify({
           status,
@@ -462,7 +462,7 @@ export default function AdminApp() {
       type: newStatus === "banned" ? "danger" : "warning",
       onConfirm: async () => {
         try {
-          const result = await authFetch(`${API_BASE}/v1/admin/users/${userId}/status`, {
+          const result = await authFetch(`${API_BASE_URL}/admin/users/${userId}/status`, {
             method: "PUT",
             body: JSON.stringify({ status: newStatus }),
           })
@@ -491,7 +491,7 @@ export default function AdminApp() {
       type: newRole === "admin" ? "warning" : "info",
       onConfirm: async () => {
         try {
-          const result = await authFetch(`${API_BASE}/v1/admin/users/${userId}/role`, {
+          const result = await authFetch(`${API_BASE_URL}/admin/users/${userId}/role`, {
             method: "PUT",
             body: JSON.stringify({ role: newRole }),
           })
@@ -512,7 +512,7 @@ export default function AdminApp() {
   // Toggle User Profile Verification Badge
   const handleToggleVerification = async (userId, currentVerified) => {
     try {
-      const result = await authFetch(`${API_BASE}/v1/admin/users/${userId}/verify`, {
+      const result = await authFetch(`${API_BASE_URL}/admin/users/${userId}/verify`, {
         method: "PUT",
         body: JSON.stringify({ isVerified: !currentVerified }),
       })
@@ -538,7 +538,7 @@ export default function AdminApp() {
       type: "danger",
       onConfirm: async () => {
         try {
-          const result = await authFetch(`${API_BASE}/v1/admin/users/${userId}`, {
+          const result = await authFetch(`${API_BASE_URL}/admin/users/${userId}`, {
             method: "DELETE",
           })
           if (!result?.ok) throw new Error(result?.json?.message || "Failed to delete user")
@@ -649,7 +649,7 @@ export default function AdminApp() {
         },
       }
 
-      const result = await authFetch(`${API_BASE}/v1/admin/users/${selectedUserDetail.user._id}/profile`, {
+      const result = await authFetch(`${API_BASE_URL}/admin/users/${selectedUserDetail.user._id}/profile`, {
         method: "PUT",
         body: JSON.stringify(payload),
       })
@@ -671,7 +671,7 @@ export default function AdminApp() {
     if (!selectedUserDetail?.user?._id) return
     setPlanSaving(true)
     try {
-      const result = await authFetch(`${API_BASE}/v1/admin/users/${selectedUserDetail.user._id}/subscriptions`, {
+      const result = await authFetch(`${API_BASE_URL}/admin/users/${selectedUserDetail.user._id}/subscriptions`, {
         method: "POST",
         body: JSON.stringify(planFormData),
       })
@@ -691,7 +691,7 @@ export default function AdminApp() {
     e.preventDefault()
     setSettingsPersonalSaving(true)
     try {
-      const result = await authFetch(`${API_BASE}/v1/admin/settings/profile`, {
+      const result = await authFetch(`${API_BASE_URL}/admin/settings/profile`, {
         method: "PUT",
         body: JSON.stringify(settingsPersonalForm),
       })
@@ -716,7 +716,7 @@ export default function AdminApp() {
     }
     setSettingsPasswordSaving(true)
     try {
-      const result = await authFetch(`${API_BASE}/v1/admin/settings/password`, {
+      const result = await authFetch(`${API_BASE_URL}/admin/settings/password`, {
         method: "PUT",
         body: JSON.stringify({
           currentPassword: settingsPasswordForm.currentPassword,

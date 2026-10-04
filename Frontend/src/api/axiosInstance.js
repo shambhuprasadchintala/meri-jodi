@@ -1,11 +1,9 @@
 import axios from "axios"
-
-const BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api/v1"
-const AUTH_BASE = BASE.replace(/\/api\/v1\/?$/, "/api/auth")
+import { API_BASE_URL, AUTH_BASE_URL, API_TIMEOUT_MS } from "./apiConfig"
 
 const axiosInstance = axios.create({
-  baseURL: BASE,
-  timeout: 15000,
+  baseURL: API_BASE_URL,
+  timeout: API_TIMEOUT_MS,
   withCredentials: true,
 })
 
@@ -29,9 +27,9 @@ axiosInstance.interceptors.response.use(
       originalRequest._retry = true
       try {
         const refreshRes = await axios.post(
-          `${AUTH_BASE}/refresh`,
+          `${AUTH_BASE_URL}/refresh`,
           {},
-          { withCredentials: true }
+          { withCredentials: true, timeout: API_TIMEOUT_MS }
         )
         const newToken =
           refreshRes.data?.data?.token ||
