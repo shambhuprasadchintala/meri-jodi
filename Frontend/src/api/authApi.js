@@ -50,7 +50,7 @@ authApi.interceptors.response.use(
 
 /**
  * Register a new user:
- * Sends email verification link via Nodemailer
+ * Sends SMS OTP to user's phone via Twilio Verify
  */
 export const registerUser = async ({ name, email, password, phone, gender, location }) => {
     const res = await authApi.post("/register", {
@@ -65,36 +65,58 @@ export const registerUser = async ({ name, email, password, phone, gender, locat
 }
 
 /**
- * Verify email verification link token
+ * Verify registration OTP or verification token
  */
-export const verifyEmailToken = async (token) => {
-    const res = await authApi.post(`/verify/${token}`)
+export const verifyEmailToken = async (tokenOrOtp, phone = null) => {
+    const res = await authApi.post(`/verify/${tokenOrOtp}`, { phone, otp: tokenOrOtp })
+    return unwrap(res)
+}
+
+export const verifyRegistrationOtp = async ({ phone, otp, token }) => {
+    const res = await authApi.post("/verify", { phone, otp, token })
     return unwrap(res)
 }
 
 /**
- * Step 1: Login with Email & Password
- * Triggers 6-digit OTP to user's email via Nodemailer
+ * Step 1: Login with Phone/Email & Password
+ * Triggers 6-digit SMS OTP to user's phone via Twilio Verify
  */
+export const loginWithCredentials = async ({ phone, email, identifier, password }) => {
+    const res = await authApi.post("/login", { phone, email, identifier, password })
+    return unwrap(res)
+}
+
 export const loginWithEmail = async (email, password) => {
     const res = await authApi.post("/login", { email, password })
     return unwrap(res)
 }
 
-/**
- * Step 2: Verify Login OTP
- * Validates OTP from email and returns tokens
- */
-export const verifyLoginOtp = async ({ email, otp }) => {
-    const res = await authApi.post("/verify", { email, otp })
+export const loginWithPhone = async (phone, password) => {
+    const res = await authApi.post("/login", { phone, password })
     return unwrap(res)
 }
 
 /**
- * Resend OTP code to email
+ * Step 2: Verify Login OTP
+ * Validates SMS OTP and returns dual tokens + user
  */
-export const resendLoginOtp = async (email) => {
-    const res = await authApi.post("/resend-otp", { email })
+export const verifyLoginOtp = async ({ phone, email, otp }) => {
+    const res = await authApi.post("/verify", { phone, email, otp })
+    return unwrap(res)
+}
+
+/**
+ * Resend SMS OTP code
+ */
+export const resendLoginOtp = async (phoneOrEmail) => {
+    const isEmail = typeof phoneOrEmail === "string" && phoneOrEmail.includes("@")
+    const payload = typeof phoneOrEmail === "object"
+        ? phoneOrEmail
+        : isEmail
+        ? { email: phoneOrEmail }
+        : { phone: phoneOrEmail }
+
+    const res = await authApi.post("/resend-otp", payload)
     return unwrap(res)
 }
 
@@ -137,25 +159,21 @@ export const logoutUser = async () => {
 }
 
 // Aliases for compatibility
-export const sendOtp = async (emailOrPhone) => {
-    // If phone or email, route to login or resend
-    if (emailOrPhone?.includes?.("@")) {
-        return resendLoginOtp(emailOrPhone)
-    }
-    const res = await authApi.post("/login", { email: emailOrPhone, password: "temp_otp_pass" })
-    return unwrap(res)
+export const sendOtp = async (phoneOrEmail) => {
+    return resendLoginOtp(phoneOrEmail)
 }
 
-export const verifyOtp = async (emailOrPhone, code, _name) => {
-    if (emailOrPhone?.includes?.("@")) {
-        return verifyLoginOtp({ email: emailOrPhone, otp: code })
+export const verifyOtp = async (phoneOrEmail, code, _name) => {
+    const isEmail = phoneOrEmail?.includes?.("@")
+    if (isEmail) {
+        return verifyLoginOtp({ email: phoneOrEmail, otp: code })
     }
-    const res = await authApi.post("/verify", { email: emailOrPhone, otp: code })
+    const res = await authApi.post("/verify", { phone: phoneOrEmail, otp: code })
     return unwrap(res)
 }
 
 /**
- * Request a password reset email
+ * Request a password reset code
  */
 export const forgotPassword = async (email) => {
     const res = await authApi.post("/forgot-password", { email })
@@ -163,7 +181,7 @@ export const forgotPassword = async (email) => {
 }
 
 /**
- * Reset password using the token from the email link
+ * Reset password using the token/code
  */
 export const resetPassword = async (token, newPassword) => {
     const res = await authApi.post(`/reset-password/${token}`, { newPassword })

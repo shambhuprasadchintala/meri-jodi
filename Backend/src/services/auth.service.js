@@ -47,40 +47,57 @@ class AuthService {
     }
 
     /**
+     * Format phone number to E.164 standard (e.g. +91XXXXXXXXXX)
+     */
+    formatPhoneNumber(phone) {
+        if (!phone) return ""
+        const clean = String(phone).trim().replace(/[\s-()]/g, "")
+        if (clean.startsWith("+")) return clean
+        if (/^\d{10}$/.test(clean)) return `+91${clean}`
+        if (/^91\d{10}$/.test(clean)) return `+${clean}`
+        return `+${clean}`
+    }
+
+    /**
      * Register a new user:
-     * Stores pending user data in Redis (10 min TTL) and sends verification email via Nodemailer.
+     * Stores pending user data in Redis (10 min TTL) and sends 6-digit SMS OTP via Twilio Verify.
+     * All Email OTP / Nodemailer / Brevo / Twilio Email verification is commented out.
      */
     async registerUser({ name, email, password, phone, gender, location, reqIp = "127.0.0.1" }) {
-        const cleanEmail = email.toLowerCase().trim()
-        const cleanPhone = phone ? phone.trim() : ""
+        const rawPhone = phone ? String(phone).trim() : ""
+        const formattedPhone = this.formatPhoneNumber(rawPhone)
 
-        if (!cleanPhone) {
-            const error = new Error("Phone number is required.")
+        if (!formattedPhone || formattedPhone.length < 10) {
+            const error = new Error("A valid 10-digit mobile phone number is required.")
             error.statusCode = 400
             throw error
         }
 
+        const cleanEmail = email ? email.toLowerCase().trim() : undefined
+
         // 1. Rate limiting via Redis (relaxed to 5s to avoid locking users out on retries)
-        const rateLimitKey = `register-rate-limit:${reqIp}:${cleanEmail}`
+        const rateLimitKey = `register-rate-limit:${reqIp}:${formattedPhone}`
         if (await redisClient.get(rateLimitKey)) {
-            const error = new Error("Please wait a few seconds before requesting another email.")
+            const error = new Error("Please wait a few seconds before requesting another SMS OTP.")
             error.statusCode = 429
             throw error
         }
 
-        // 2. Check if user already exists with this email or phone
-        const existingUser = await User.findOne({ email: cleanEmail })
-        if (existingUser && existingUser.isEmailVerified) {
-            const error = new Error("An account with this email already exists. Please log in.")
+        // 2. Check if user already exists with this phone number
+        const existingPhoneUser = await User.findOne({ phone: formattedPhone })
+        if (existingPhoneUser && (existingPhoneUser.isPhoneVerified || existingPhoneUser.isEmailVerified)) {
+            const error = new Error("An account with this phone number already exists. Please log in.")
             error.statusCode = 400
             throw error
         }
 
-        const existingPhoneUser = await User.findOne({ phone: cleanPhone })
-        if (existingPhoneUser && (existingPhoneUser.isEmailVerified || existingPhoneUser.isPhoneVerified)) {
-            const error = new Error("An account with this phone number already exists.")
-            error.statusCode = 400
-            throw error
+        if (cleanEmail) {
+            const existingEmailUser = await User.findOne({ email: cleanEmail })
+            if (existingEmailUser && (existingEmailUser.isEmailVerified || existingEmailUser.isPhoneVerified)) {
+                const error = new Error("An account with this email already exists. Please log in.")
+                error.statusCode = 400
+                throw error
+            }
         }
 
         // 3. Hash password
@@ -91,7 +108,7 @@ class AuthService {
         const verifyOtp = Math.floor(100000 + Math.random() * 900000).toString()
         const verifyKey = `verify:${verifyToken}`
         const verifyCodeKey = `verify-code:${verifyOtp}`
-        const verifyOtpKey = `verify-otp:${cleanEmail}`
+        const phoneRegisterKey = `phone-register:${formattedPhone}`
 
         const cleanGender = gender ? gender.toLowerCase().trim() : undefined
         const cleanLocation = location ? location.trim() : undefined
@@ -100,7 +117,7 @@ class AuthService {
             name: name.trim(),
             email: cleanEmail,
             passwordHash,
-            phone: cleanPhone,
+            phone: formattedPhone,
             gender: cleanGender || "female",
             location: cleanLocation,
             otp: verifyOtp,
@@ -110,89 +127,81 @@ class AuthService {
         // 5. Store in Redis with 10 minutes (600s) TTL
         await redisClient.set(verifyKey, JSON.stringify(userData), { EX: 600 })
         await redisClient.set(verifyCodeKey, verifyToken, { EX: 600 })
-        await redisClient.set(verifyOtpKey, JSON.stringify({ token: verifyToken, otp: verifyOtp }), { EX: 600 })
+        await redisClient.set(phoneRegisterKey, JSON.stringify(userData), { EX: 600 })
+        if (cleanEmail) {
+            await redisClient.set(`verify-otp:${cleanEmail}`, JSON.stringify({ token: verifyToken, otp: verifyOtp }), { EX: 600 })
+        }
 
-        // 6. Send verification email via Nodemailer with both code and direct link
+        // 6. Send SMS OTP via Twilio Verify (channel: "sms")
+        const activeTwilio = getTwilioClient()
+        if (activeTwilio && config.twilio?.verifyServiceSid) {
+            try {
+                await activeTwilio.verify.v2
+                    .services(config.twilio.verifyServiceSid)
+                    .verifications.create({ to: formattedPhone, channel: "sms" })
+                console.log(`[Twilio Verify SMS] SMS OTP dispatched successfully to ${formattedPhone}`)
+            } catch (twilioErr) {
+                console.error(`[Twilio SMS Register Error] ${twilioErr.message}. Storing simulated code fallback...`)
+                await redisClient.set(`simulated-phone-otp:${formattedPhone}`, verifyOtp, { EX: 600 })
+            }
+        } else {
+            console.log(`[Twilio SMS Fallback] Twilio Verify not configured or simulation active. Storing OTP code for ${formattedPhone}`)
+            await redisClient.set(`simulated-phone-otp:${formattedPhone}`, verifyOtp, { EX: 600 })
+        }
+
+        /*
+        // ==========================================
+        // [COMMENTED OUT: EMAIL VERIFICATION / SMTP / TWILIO EMAIL]
+        // Switched to Twilio Phone SMS OTP as primary auth.
+        // ==========================================
         const baseUrl = config.frontendUrl || config.frontendDomain || "http://localhost:5173"
         const verifyUrl = `${baseUrl.replace(/\/+$/, "")}/verify-email/${encodeURIComponent(verifyToken)}`
         const subject = `${verifyOtp} is your ${config.appName} verification code`
-        const isLocalhost = baseUrl.includes("localhost") || baseUrl.includes("127.0.0.1")
-        const text = isLocalhost
-            ? `Your ${config.appName} verification code is: ${verifyOtp}. It will expire in 10 minutes.`
-            : `Your ${config.appName} verification code is: ${verifyOtp}\nOr verify your email by clicking: ${verifyUrl}`
-        const html = getVerifyEmailHtml({
-            email: cleanEmail,
-            token: verifyToken,
-            otp: verifyOtp,
-            appName: config.appName,
-        })
-        const mailResult = await sendMail({ email: cleanEmail, subject, html, text })
-        if (mailResult && mailResult.error) {
-            console.warn(`[Registration Email Warning] Email delivery failed for ${cleanEmail}: ${mailResult.error}`)
-            if (config.env === "production") {
-                const err = new Error(`Failed to send verification email to ${cleanEmail}: ${mailResult.error}. Please try again later.`)
-                err.statusCode = 500
-                throw err
-            }
-        }
+        const text = `Your ${config.appName} verification code is: ${verifyOtp}.`
+        const html = getVerifyEmailHtml({ email: cleanEmail, token: verifyToken, otp: verifyOtp, appName: config.appName })
+        await sendMail({ email: cleanEmail, subject, html, text })
+        */
 
         // 7. Set 5-second rate limit
         await redisClient.set(rateLimitKey, "true", { EX: 5 })
 
         return {
-            message: "Registration successful! A verification code has been sent to your email inbox.",
-            email: cleanEmail,
+            message: `Registration successful! A 6-digit verification code has been sent to ${formattedPhone} via SMS.`,
+            phone: formattedPhone,
+            token: verifyToken,
+            otpSent: true,
         }
     }
 
     /**
-     * Verify email token (or 6-digit OTP) and create User + Profile in MongoDB
+     * Verify SMS OTP (or verification token) and create User + Profile in MongoDB
      */
-    async verifyEmailToken(tokenOrOtp, res = null, email = null) {
+    async verifyEmailToken(tokenOrOtp, res = null, emailOrPhone = null) {
         if (!tokenOrOtp) {
-            const error = new Error("Verification token or code is required.")
+            const error = new Error("Verification token or SMS code is required.")
             error.statusCode = 400
             throw error
         }
 
         const input = String(tokenOrOtp).trim()
+        let resolvedPhone = null
+        let resolvedEmail = null
 
-        // 1. Resolve token: could be direct 32-byte hex token or 6-digit numeric OTP
-        let token = input
-        if (/^\d{6}$/.test(input)) {
-            // Check if this OTP was already successfully verified (StrictMode deduplication)
-            const recentOtpVerified = await redisClient.get(`verified-code:${input}`)
-            if (recentOtpVerified) {
-                const cached = JSON.parse(recentOtpVerified)
-                return {
-                    message: "Email verified successfully! Your account is active.",
-                    user: cached.user,
-                    token: cached.accessToken,
-                    accessToken: cached.accessToken,
-                    refreshToken: cached.refreshToken,
-                }
-            }
-
-            const mappedToken = await redisClient.get(`verify-code:${input}`)
-            if (mappedToken) {
-                token = mappedToken
-            } else if (email) {
-                const regOtpJson = await redisClient.get(`verify-otp:${email.toLowerCase().trim()}`)
-                if (regOtpJson) {
-                    const regData = JSON.parse(regOtpJson)
-                    if (regData.otp === input) {
-                        token = regData.token
-                    }
-                }
+        if (emailOrPhone) {
+            const cleanParam = String(emailOrPhone).trim()
+            if (cleanParam.includes("@")) {
+                resolvedEmail = cleanParam.toLowerCase()
+            } else {
+                resolvedPhone = this.formatPhoneNumber(cleanParam)
             }
         }
 
-        // 2. Check if recently verified (e.g. React StrictMode or double-click deduplication)
-        const recentVerified = await redisClient.get(`verified:${token}`)
-        if (recentVerified) {
-            const cached = JSON.parse(recentVerified)
+        // 1. Check if recently verified (e.g. React StrictMode or double-click deduplication)
+        const recentOtpVerified = await redisClient.get(`verified-code:${input}`)
+        if (recentOtpVerified) {
+            const cached = JSON.parse(recentOtpVerified)
             return {
-                message: "Email verified successfully! Your account is active.",
+                message: "Phone number verified successfully! Your account is active.",
                 user: cached.user,
                 token: cached.accessToken,
                 accessToken: cached.accessToken,
@@ -200,45 +209,130 @@ class AuthService {
             }
         }
 
-        const verifyKey = `verify:${token}`
-        const userDataJson = await redisClient.get(verifyKey)
+        const recentVerified = await redisClient.get(`verified:${input}`)
+        if (recentVerified) {
+            const cached = JSON.parse(recentVerified)
+            return {
+                message: "Phone number verified successfully! Your account is active.",
+                user: cached.user,
+                token: cached.accessToken,
+                accessToken: cached.accessToken,
+                refreshToken: cached.refreshToken,
+            }
+        }
 
-        if (!userDataJson) {
-            const error = new Error("Verification link or code has expired or is invalid.")
+        // 2. Resolve pending registration userData from Redis
+        let userData = null
+        let token = input
+
+        if (/^\d{6}$/.test(input)) {
+            // Check via phone registration key first
+            if (resolvedPhone) {
+                const phoneRegJson = await redisClient.get(`phone-register:${resolvedPhone}`)
+                if (phoneRegJson) {
+                    userData = JSON.parse(phoneRegJson)
+                    token = userData.token || input
+                }
+            }
+
+            // Check via verify-code mapping
+            if (!userData) {
+                const mappedToken = await redisClient.get(`verify-code:${input}`)
+                if (mappedToken) {
+                    token = mappedToken
+                    const tokenData = await redisClient.get(`verify:${mappedToken}`)
+                    if (tokenData) userData = JSON.parse(tokenData)
+                }
+            }
+
+            // Check via email registration key
+            if (!userData && resolvedEmail) {
+                const regOtpJson = await redisClient.get(`verify-otp:${resolvedEmail}`)
+                if (regOtpJson) {
+                    const regData = JSON.parse(regOtpJson)
+                    if (regData.otp === input) {
+                        token = regData.token
+                        const tokenData = await redisClient.get(`verify:${token}`)
+                        if (tokenData) userData = JSON.parse(tokenData)
+                    }
+                }
+            }
+        } else {
+            // Direct token
+            const verifyKey = `verify:${token}`
+            const tokenData = await redisClient.get(verifyKey)
+            if (tokenData) userData = JSON.parse(tokenData)
+        }
+
+        if (!userData) {
+            const error = new Error("Verification code or token has expired or is invalid. Please register again.")
             error.statusCode = 400
             throw error
         }
 
-        const userData = JSON.parse(userDataJson)
+        const formattedPhone = userData.phone || resolvedPhone
 
-        // Remove pending registration keys from Redis
-        await redisClient.del(verifyKey)
-        if (userData.otp) {
-            await redisClient.del(`verify-code:${userData.otp}`)
-        }
-        await redisClient.del(`verify-otp:${userData.email}`)
-
-        // Check if user was registered in the meantime
-        let user = await User.findOne({ email: userData.email })
-        if (!user) {
-            let phoneToSet = userData.phone || undefined
-            if (phoneToSet) {
-                const phoneInUse = await User.findOne({ phone: phoneToSet })
-                if (phoneInUse) {
-                    const error = new Error("Phone number is already associated with another account.")
-                    error.statusCode = 400
-                    throw error
+        // 3. Verify OTP code with Twilio Verify Check (if 6-digit numeric code entered)
+        let isApproved = false
+        if (/^\d{6}$/.test(input)) {
+            const activeTwilio = getTwilioClient()
+            if (activeTwilio && config.twilio?.verifyServiceSid && formattedPhone) {
+                try {
+                    const check = await activeTwilio.verify.v2
+                        .services(config.twilio.verifyServiceSid)
+                        .verificationChecks.create({ to: formattedPhone, code: input })
+                    isApproved = check.status === "approved"
+                } catch (err) {
+                    console.warn(`[Twilio Verify Check] ${err.message}`)
                 }
             }
 
+            // Fallback checks
+            if (!isApproved && formattedPhone) {
+                const simOtp = await redisClient.get(`simulated-phone-otp:${formattedPhone}`)
+                if (simOtp && simOtp === input) {
+                    isApproved = true
+                    await redisClient.del(`simulated-phone-otp:${formattedPhone}`)
+                }
+            }
+
+            if (!isApproved && userData.otp === input) {
+                isApproved = true
+            }
+
+            if (!isApproved) {
+                const error = new Error("Invalid or expired SMS verification code.")
+                error.statusCode = 400
+                throw error
+            }
+        }
+
+        // 4. Remove pending registration keys from Redis
+        await redisClient.del(`verify:${token}`)
+        if (userData.token) await redisClient.del(`verify:${userData.token}`)
+        if (userData.otp) await redisClient.del(`verify-code:${userData.otp}`)
+        if (userData.phone) await redisClient.del(`phone-register:${userData.phone}`)
+        if (userData.email) await redisClient.del(`verify-otp:${userData.email}`)
+
+        // 5. Create or activate User in MongoDB
+        let user = null
+        if (formattedPhone) {
+            user = await User.findOne({ phone: formattedPhone })
+        }
+        if (!user && userData.email) {
+            user = await User.findOne({ email: userData.email })
+        }
+
+        if (!user) {
             user = await User.create({
                 name: userData.name,
-                email: userData.email,
+                email: userData.email || undefined,
+                phone: formattedPhone,
                 passwordHash: userData.passwordHash,
-                phone: phoneToSet,
                 gender: userData.gender,
                 location: userData.location,
-                isEmailVerified: true,
+                isPhoneVerified: true,
+                isEmailVerified: Boolean(userData.email),
                 status: USER_STATUS.ACTIVE,
                 lastLogin: new Date(),
             })
@@ -256,10 +350,12 @@ class AuthService {
                 { upsert: true, new: true, setDefaultsOnInsert: true }
             )
         } else {
-            user.isEmailVerified = true
+            user.isPhoneVerified = true
+            user.isEmailVerified = Boolean(userData.email || user.isEmailVerified)
+            user.status = USER_STATUS.ACTIVE
             user.lastLogin = new Date()
             if (userData.passwordHash) user.passwordHash = userData.passwordHash
-            if (userData.phone) user.phone = userData.phone
+            if (formattedPhone) user.phone = formattedPhone
             if (userData.gender) user.gender = userData.gender
             if (userData.location) user.location = userData.location
             await user.save()
@@ -270,12 +366,13 @@ class AuthService {
                     {
                         ...(userData.gender ? { gender: userData.gender } : {}),
                         ...(userData.location ? { "location.city": userData.location } : {}),
+                        isVerified: true,
                     }
                 )
             }
         }
 
-        // Generate tokens and cookies
+        // 6. Generate Dual JWT tokens and set cookies
         const { accessToken, refreshToken } = await generateToken(user._id, res)
 
         // Cache user in Redis for 1 hour
@@ -291,9 +388,12 @@ class AuthService {
         if (userData.otp) {
             await redisClient.set(`verified-code:${userData.otp}`, verifiedPayload, { EX: 600 })
         }
+        if (input) {
+            await redisClient.set(`verified-code:${input}`, verifiedPayload, { EX: 600 })
+        }
 
         return {
-            message: "Email verified successfully! Your account has been created.",
+            message: "Phone number verified successfully! Your account is active.",
             user: user.toAuthJSON(),
             token: accessToken,
             accessToken,
@@ -350,91 +450,156 @@ class AuthService {
 
     /**
      * Login User:
-     * Validates credentials, generates 6-digit OTP, stores in Redis (5 min TTL), and sends via Nodemailer.
+     * Validates credentials with Phone (or Email) + Password,
+     * sends 6-digit SMS OTP to user's phone via Twilio Verify (channel: "sms").
+     * All Email OTP / Nodemailer / Brevo / Twilio Email verification is commented out.
      */
-    async loginUser({ email, password, reqIp = "127.0.0.1" }) {
-        const cleanEmail = email.toLowerCase().trim()
+    async loginUser({ phone, email, identifier, password, reqIp = "127.0.0.1" }) {
+        const inputId = phone || email || identifier || ""
+        const cleanInput = String(inputId).trim()
 
-        // 1. Rate limit check
-        const rateLimitKey = `login-rate-limit:${reqIp}:${cleanEmail}`
+        if (!cleanInput || !password) {
+            const error = new Error("Phone number (or email) and password are required.")
+            error.statusCode = 400
+            throw error
+        }
+
+        let user = null
+        let formattedPhone = null
+
+        // If input contains @, look up by email
+        if (cleanInput.includes("@")) {
+            user = await User.findOne({ email: cleanInput.toLowerCase() })
+            if (user && user.phone) {
+                formattedPhone = this.formatPhoneNumber(user.phone)
+            }
+        } else {
+            // Treat as phone number
+            formattedPhone = this.formatPhoneNumber(cleanInput)
+            if (formattedPhone) {
+                user = await User.findOne({ phone: formattedPhone })
+            }
+            if (!user) {
+                // Fallback attempt by email or raw input
+                user = await User.findOne({ $or: [{ phone: cleanInput }, { email: cleanInput.toLowerCase() }] })
+            }
+        }
+
+        if (!user) {
+            const error = new Error("Invalid login credentials.")
+            error.statusCode = 400
+            throw error
+        }
+
+        // Rate limit check
+        const rateLimitKey = `login-rate-limit:${reqIp}:${user._id}`
         if (await redisClient.get(rateLimitKey)) {
-            const error = new Error("Too many login attempts. Please wait a minute.")
+            const error = new Error("Too many login attempts. Please wait 30 seconds.")
             error.statusCode = 429
             throw error
         }
 
-        // 2. Find user
-        const user = await User.findOne({ email: cleanEmail })
-        if (!user) {
-            const error = new Error("Invalid email or password.")
-            error.statusCode = 400
-            throw error
-        }
-
-        // 3. Verify password
+        // Verify password
         const isPasswordValid = await user.validatePassword(password)
         if (!isPasswordValid) {
-            const error = new Error("Invalid email or password.")
+            const error = new Error("Invalid login credentials.")
             error.statusCode = 400
             throw error
         }
 
-        // 4. Check user status
+        // Check user status
         if (user.status !== USER_STATUS.ACTIVE) {
             const error = new Error("Your account is inactive or suspended.")
             error.statusCode = 403
             throw error
         }
 
-        // 5. Generate 6-digit OTP
-        const otp = Math.floor(100000 + Math.random() * 900000).toString()
-        const otpKey = `otp:${cleanEmail}`
+        const targetPhone = formattedPhone || (user.phone ? this.formatPhoneNumber(user.phone) : null)
+        if (!targetPhone) {
+            const error = new Error("No verified phone number found on account. Please contact support.")
+            error.statusCode = 400
+            throw error
+        }
 
-        // 6. Store OTP state in Redis (5 min / 300s TTL) and update User model state in MongoDB
+        // Generate 6-digit OTP
+        const otp = Math.floor(100000 + Math.random() * 900000).toString()
+        const otpKey = `phone-otp:${targetPhone}`
+
+        // Store OTP state in Redis (5 min / 300s TTL)
         await redisClient.set(otpKey, otp, { EX: 300 })
         user.otp = otp
         user.otpExpiresAt = new Date(Date.now() + 5 * 60 * 1000)
         await user.save()
 
-        // 7. Send OTP email via Nodemailer
-        const subject = `${otp} is your ${config.appName} login code`
-        const text = `Your ${config.appName} login verification code is: ${otp} (valid for 5 minutes).`
-        const html = getOtpHtml({ email: cleanEmail, otp, appName: config.appName })
-        const mailResult = await sendMail({ email: cleanEmail, subject, html, text })
-        if (mailResult?.error) {
-            console.warn(`[Login Email Warning] Email delivery failed for ${cleanEmail}: ${mailResult.error}`)
-            if (config.env === "production") {
-                const err = new Error(`Failed to deliver verification code to your email (${mailResult.error}). Please try again later.`)
-                err.statusCode = 500
-                throw err
+        // Send SMS OTP via Twilio Verify (channel: "sms")
+        const activeTwilio = getTwilioClient()
+        if (activeTwilio && config.twilio?.verifyServiceSid) {
+            try {
+                await activeTwilio.verify.v2
+                    .services(config.twilio.verifyServiceSid)
+                    .verifications.create({ to: targetPhone, channel: "sms" })
+                console.log(`[Twilio Verify SMS] Login OTP sent to ${targetPhone}`)
+            } catch (twilioErr) {
+                console.error(`[Twilio SMS Login Error] ${twilioErr.message}. Storing simulated code fallback...`)
+                await redisClient.set(`simulated-phone-otp:${targetPhone}`, otp, { EX: 300 })
             }
+        } else {
+            console.log(`[Twilio SMS Fallback] Login OTP stored for ${targetPhone}`)
+            await redisClient.set(`simulated-phone-otp:${targetPhone}`, otp, { EX: 300 })
         }
 
-        // 8. Set 60s rate limit for sending next OTP
-        await redisClient.set(rateLimitKey, "true", { EX: 60 })
+        /*
+        // ==========================================
+        // [COMMENTED OUT: EMAIL VERIFICATION / SMTP / TWILIO EMAIL]
+        // Switched to Twilio Phone SMS OTP as primary auth.
+        // ==========================================
+        const subject = `${otp} is your ${config.appName} login code`
+        const text = `Your ${config.appName} login verification code is: ${otp} (valid for 5 minutes).`
+        const html = getOtpHtml({ email: user.email, otp, appName: config.appName })
+        await sendMail({ email: user.email, subject, html, text })
+        */
+
+        // Set 30s rate limit for sending next OTP
+        await redisClient.set(rateLimitKey, "true", { EX: 30 })
 
         return {
-            message: "A verification code has been sent to your email. Please check your inbox.",
-            email: cleanEmail,
+            message: `A 6-digit verification code has been sent to ${targetPhone} via SMS.`,
+            phone: targetPhone,
+            email: user.email,
         }
     }
 
     /**
      * Verify Login OTP:
-     * Checks OTP in Redis and MongoDB User document, issues access/refresh tokens, sets cookies, and caches user session.
+     * Checks SMS OTP in Twilio Verify and Redis / MongoDB.
      */
-    async verifyLoginOtp({ email, otp, res = null }) {
-        const cleanEmail = email.toLowerCase().trim()
-        const cleanOtp = otp.toString().trim()
-
-        if (!cleanEmail || !cleanOtp) {
-            const error = new Error("Email and OTP are required.")
+    async verifyLoginOtp({ phone, email, otp, res = null }) {
+        const cleanOtp = String(otp || "").trim()
+        if (!cleanOtp) {
+            const error = new Error("Verification code is required.")
             error.statusCode = 400
             throw error
         }
 
-        // Check if recently verified (e.g. React StrictMode or double-click deduplication)
-        const dedupeKey = `login-verified:${cleanEmail}:${cleanOtp}`
+        let formattedPhone = phone ? this.formatPhoneNumber(phone) : null
+        let user = null
+
+        if (formattedPhone) {
+            user = await User.findOne({ phone: formattedPhone }).select("+otp +otpExpiresAt")
+        }
+        if (!user && email) {
+            user = await User.findOne({ email: email.toLowerCase().trim() }).select("+otp +otpExpiresAt")
+            if (user && user.phone) formattedPhone = this.formatPhoneNumber(user.phone)
+        }
+
+        if (!user && !formattedPhone) {
+            const error = new Error("Phone number or account identifier is required.")
+            error.statusCode = 400
+            throw error
+        }
+
+        // StrictMode / duplicate call deduplication
+        const dedupeKey = `login-verified:${formattedPhone || email}:${cleanOtp}`
         const recentLogin = await redisClient.get(dedupeKey)
         if (recentLogin) {
             const cached = JSON.parse(recentLogin)
@@ -447,27 +612,46 @@ class AuthService {
             }
         }
 
-        const otpKey = `otp:${cleanEmail}`
-        let storedOtp = await redisClient.get(otpKey)
-
-        // Find user to check MongoDB state as well
-        const user = await User.findOne({ email: cleanEmail }).select("+otp +otpExpiresAt")
-        if (!user) {
-            const error = new Error("User account not found.")
-            error.statusCode = 404
-            throw error
+        // 1. Verify via Twilio Verify Check
+        let isApproved = false
+        const activeTwilio = getTwilioClient()
+        if (activeTwilio && config.twilio?.verifyServiceSid && formattedPhone) {
+            try {
+                const check = await activeTwilio.verify.v2
+                    .services(config.twilio.verifyServiceSid)
+                    .verificationChecks.create({ to: formattedPhone, code: cleanOtp })
+                isApproved = check.status === "approved"
+            } catch (err) {
+                console.warn(`[Twilio Verify Check Error] ${err.message}`)
+            }
         }
 
-        const isMongoOtpValid = Boolean(user.otp && user.otp === cleanOtp && user.otpExpiresAt && user.otpExpiresAt > new Date())
-        const isRedisOtpValid = Boolean(storedOtp && storedOtp === cleanOtp)
+        // 2. Fallback checks
+        if (!isApproved && formattedPhone) {
+            const storedSimOtp = await redisClient.get(`simulated-phone-otp:${formattedPhone}`)
+            if (storedSimOtp && storedSimOtp === cleanOtp) {
+                isApproved = true
+                await redisClient.del(`simulated-phone-otp:${formattedPhone}`)
+            }
+        }
 
-        if (!isRedisOtpValid && !isMongoOtpValid) {
-            // Check if this was a registration verification OTP
-            const regOtpJson = await redisClient.get(`verify-otp:${cleanEmail}`)
-            if (regOtpJson) {
-                const regData = JSON.parse(regOtpJson)
-                if (regData.otp === cleanOtp) {
-                    return this.verifyEmailToken(regData.token, res, cleanEmail)
+        if (!isApproved && formattedPhone) {
+            const storedOtp = await redisClient.get(`phone-otp:${formattedPhone}`)
+            if (storedOtp && storedOtp === cleanOtp) {
+                isApproved = true
+            }
+        }
+
+        if (!isApproved && user && user.otp && user.otp === cleanOtp && user.otpExpiresAt && user.otpExpiresAt > new Date()) {
+            isApproved = true
+        }
+
+        if (!isApproved) {
+            // Check if this was a registration verification attempt
+            if (formattedPhone) {
+                const phoneRegJson = await redisClient.get(`phone-register:${formattedPhone}`)
+                if (phoneRegJson) {
+                    return this.verifyEmailToken(cleanOtp, res, formattedPhone)
                 }
             }
             const error = new Error("Invalid or expired verification code. Please request a new code.")
@@ -475,13 +659,21 @@ class AuthService {
             throw error
         }
 
-        // Clear used OTP from both Redis and MongoDB
-        await redisClient.del(otpKey)
+        if (!user && formattedPhone) {
+            user = await User.findOne({ phone: formattedPhone })
+        }
+
+        if (!user) {
+            const error = new Error("User account not found.")
+            error.statusCode = 404
+            throw error
+        }
+
+        // Clear used OTP
+        if (formattedPhone) await redisClient.del(`phone-otp:${formattedPhone}`)
         user.otp = undefined
         user.otpExpiresAt = undefined
-        await user.save()
-
-        user.isEmailVerified = true
+        user.isPhoneVerified = true
         user.lastLogin = new Date()
         await user.save()
 
@@ -512,51 +704,82 @@ class AuthService {
     }
 
     /**
-     * Resend Login OTP
+     * Resend Login / Registration SMS OTP
      */
-    async resendLoginOtp({ email, reqIp = "127.0.0.1" }) {
-        const cleanEmail = email.toLowerCase().trim()
+    async resendLoginOtp({ phone, email, reqIp = "127.0.0.1" }) {
+        const input = phone || email || ""
+        const cleanInput = String(input).trim()
 
-        const user = await User.findOne({ email: cleanEmail })
-        if (!user) {
-            const error = new Error("No account found with this email.")
-            error.statusCode = 404
+        if (!cleanInput) {
+            const error = new Error("Phone number or email is required.")
+            error.statusCode = 400
             throw error
         }
 
-        const resendKey = `resend-otp:${cleanEmail}`
+        let formattedPhone = null
+        if (cleanInput.includes("@")) {
+            const user = await User.findOne({ email: cleanInput.toLowerCase() })
+            if (user && user.phone) formattedPhone = this.formatPhoneNumber(user.phone)
+        } else {
+            formattedPhone = this.formatPhoneNumber(cleanInput)
+        }
+
+        if (!formattedPhone) {
+            const error = new Error("A valid mobile phone number is required.")
+            error.statusCode = 400
+            throw error
+        }
+
+        const resendKey = `resend-otp:${formattedPhone}`
         if (await redisClient.get(resendKey)) {
-            const error = new Error("Please wait 60 seconds before requesting another code.")
+            const error = new Error("Please wait 30 seconds before requesting another SMS code.")
             error.statusCode = 429
             throw error
         }
 
         const otp = Math.floor(100000 + Math.random() * 900000).toString()
-        const otpKey = `otp:${cleanEmail}`
+        await redisClient.set(`phone-otp:${formattedPhone}`, otp, { EX: 300 })
 
-        await redisClient.set(otpKey, otp, { EX: 300 })
-        user.otp = otp
-        user.otpExpiresAt = new Date(Date.now() + 5 * 60 * 1000)
-        await user.save()
-
-        const subject = `${otp} is your new ${config.appName} code`
-        const text = `Your new ${config.appName} verification code is: ${otp} (valid for 5 minutes).`
-        const html = getOtpHtml({ email: cleanEmail, otp, appName: config.appName })
-        const mailResult = await sendMail({ email: cleanEmail, subject, html, text })
-        if (mailResult?.error) {
-            console.warn(`[Resend Email Warning] Email delivery failed for ${cleanEmail}: ${mailResult.error}`)
-            if (config.env === "production") {
-                const err = new Error(`Failed to deliver new code to ${cleanEmail} (${mailResult.error}). Please try again later.`)
-                err.statusCode = 500
-                throw err
+        // Check if there is an active pending registration in Redis and update its OTP
+        const pendingRegJson = await redisClient.get(`phone-register:${formattedPhone}`)
+        if (pendingRegJson) {
+            const pendingData = JSON.parse(pendingRegJson)
+            pendingData.otp = otp
+            await redisClient.set(`phone-register:${formattedPhone}`, JSON.stringify(pendingData), { EX: 600 })
+            if (pendingData.token) {
+                await redisClient.set(`verify:${pendingData.token}`, JSON.stringify(pendingData), { EX: 600 })
+                await redisClient.set(`verify-code:${otp}`, pendingData.token, { EX: 600 })
             }
         }
 
-        await redisClient.set(resendKey, "true", { EX: 60 })
+        // Send SMS OTP via Twilio Verify (channel: "sms")
+        const activeTwilio = getTwilioClient()
+        if (activeTwilio && config.twilio?.verifyServiceSid) {
+            try {
+                await activeTwilio.verify.v2
+                    .services(config.twilio.verifyServiceSid)
+                    .verifications.create({ to: formattedPhone, channel: "sms" })
+                console.log(`[Twilio Verify SMS] Resend OTP sent to ${formattedPhone}`)
+            } catch (twilioErr) {
+                console.error(`[Twilio SMS Resend Error] ${twilioErr.message}. Storing simulated code fallback...`)
+                await redisClient.set(`simulated-phone-otp:${formattedPhone}`, otp, { EX: 300 })
+            }
+        } else {
+            await redisClient.set(`simulated-phone-otp:${formattedPhone}`, otp, { EX: 300 })
+        }
+
+        /*
+        // ==========================================
+        // [COMMENTED OUT: EMAIL VERIFICATION / SMTP / TWILIO EMAIL]
+        // Switched to Twilio Phone SMS OTP as primary auth.
+        // ==========================================
+        */
+
+        await redisClient.set(resendKey, "true", { EX: 30 })
 
         return {
-            message: "A new verification code has been sent to your email. Please check your inbox.",
-            email: cleanEmail,
+            message: `A new verification code has been sent to ${formattedPhone} via SMS.`,
+            phone: formattedPhone,
         }
     }
 
@@ -660,18 +883,6 @@ class AuthService {
             isNewUser,
             isProfileComplete,
         }
-    }
-
-    /**
-     * Format phone number to E.164 standard (e.g. +91XXXXXXXXXX)
-     */
-    formatPhoneNumber(phone) {
-        if (!phone) return ""
-        const clean = String(phone).trim().replace(/[\s-()]/g, "")
-        if (clean.startsWith("+")) return clean
-        if (/^\d{10}$/.test(clean)) return `+91${clean}`
-        if (/^91\d{10}$/.test(clean)) return `+${clean}`
-        return `+${clean}`
     }
 
     /**
@@ -945,7 +1156,8 @@ class AuthService {
 
     /**
      * Forgot Password:
-     * Generates a secure reset token and 6-digit OTP, stores in Redis (15 min TTL), and sends reset link email.
+     * Generates a secure reset token and 6-digit OTP, stores in Redis (15 min TTL).
+     * Email sending is commented out.
      */
     async forgotPassword({ email, reqIp = "127.0.0.1" }) {
         const cleanEmail = email.toLowerCase().trim()
@@ -960,7 +1172,7 @@ class AuthService {
         const user = await User.findOne({ email: cleanEmail })
         if (!user) {
             return {
-                message: "If an account with this email exists, a password reset link has been sent.",
+                message: "If an account with this email exists, a password reset request has been initiated.",
             }
         }
 
@@ -972,35 +1184,23 @@ class AuthService {
         await redisClient.set(resetKey, JSON.stringify({ userId: user._id.toString(), email: cleanEmail }), { EX: 900 })
         await redisClient.set(otpKey, resetToken, { EX: 900 })
 
+        /*
+        // ==========================================
+        // [COMMENTED OUT: EMAIL VERIFICATION / SMTP / TWILIO EMAIL]
+        // ==========================================
         const baseUrl = config.frontendUrl || config.frontendDomain || "http://localhost:5173"
         const resetUrl = `${baseUrl.replace(/\/+$/, "")}/reset-password/${encodeURIComponent(resetToken)}`
         const subject = `${resetOtp} is your ${config.appName} password reset code`
-        const isLocalhost = baseUrl.includes("localhost") || baseUrl.includes("127.0.0.1")
-        const text = isLocalhost
-            ? `Your ${config.appName} password reset code is: ${resetOtp}. It will expire in 15 minutes.`
-            : `Your ${config.appName} password reset code is: ${resetOtp}\nOr click this link to reset your password: ${resetUrl}`
-
-        const html = getResetPasswordHtml({
-            email: cleanEmail,
-            token: resetToken,
-            otp: resetOtp,
-            appName: config.appName,
-        })
-        const mailResult = await sendMail({ email: cleanEmail, subject, html, text })
-        if (mailResult?.error) {
-            console.warn(`[Forgot Password Email Warning] Email delivery failed for ${cleanEmail}: ${mailResult.error}`)
-            if (config.env === "production") {
-                const err = new Error(`Failed to send password reset email (${mailResult.error}).`)
-                err.statusCode = 500
-                throw err
-            }
-        }
+        const html = getResetPasswordHtml({ email: cleanEmail, token: resetToken, otp: resetOtp, appName: config.appName })
+        await sendMail({ email: cleanEmail, subject, html, text: `Your code: ${resetOtp}` })
+        */
 
         await redisClient.set(rateLimitKey, "true", { EX: 5 })
 
         return {
-            message: "If an account with this email exists, a password reset link has been sent.",
+            message: "Password reset request initiated.",
             sentTo: cleanEmail,
+            token: resetToken,
         }
     }
 

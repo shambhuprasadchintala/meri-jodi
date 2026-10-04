@@ -14,6 +14,8 @@ const router = express.Router()
 router.use(authenticate, attachUser, requireAdmin)
 
 // Statistics & KPIs
+router.get("/", adminController.getStats.bind(adminController))
+router.get("/dashboard", adminController.getStats.bind(adminController))
 router.get("/stats", adminController.getStats.bind(adminController))
 router.get("/health", adminController.getHealth.bind(adminController))
 router.get("/activity-logs", adminController.getActivityLogs.bind(adminController))
@@ -50,5 +52,3 @@ router.get("/reports", reportController.getReports.bind(reportController))
 router.put("/reports/:id/status", validateObjectId("id"), ...updateReportStatus, validate, reportController.updateReportStatus.bind(reportController))
 
 export default router
-
-

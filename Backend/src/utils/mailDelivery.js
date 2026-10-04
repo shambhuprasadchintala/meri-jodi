@@ -6,6 +6,11 @@ export const createMailSender = (config, { createTransport, fetchImpl = globalTh
         const fromEmail = (config.mail?.fromEmail || config.smtp.user || "").trim()
 
         try {
+            /* 
+            // ==========================================
+            // [COMMENTED OUT: BREVO & TWILIO EMAIL PROVIDERS]
+            // Authentication and OTPs now use Twilio SMS Phone OTP.
+            // ==========================================
             if (provider === "brevo") {
                 const apiKey = (config.mail?.brevoApiKey || "").trim()
                 if (!apiKey || !fromEmail) {
@@ -34,12 +39,42 @@ export const createMailSender = (config, { createTransport, fetchImpl = globalTh
                 return { messageId: result.messageId }
             }
 
-            if (provider !== "smtp") return { error: "Unsupported MAIL_PROVIDER. Use smtp or brevo." }
+            if (provider === "twilio" || provider === "sendgrid") {
+                const twilioApiKey = (config.twilio?.sendgridApiKey || process.env.SENDGRID_API_KEY || process.env.TWILIO_SENDGRID_API_KEY || "").trim()
+                if (twilioApiKey) {
+                    const response = await fetchImpl("https://api.sendgrid.com/v3/mail/send", {
+                        method: "POST",
+                        headers: {
+                            Authorization: `Bearer ${twilioApiKey}`,
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({
+                            personalizations: [{ to: [{ email }] }],
+                            from: { email: fromEmail || config.smtp.user, name: config.appName },
+                            subject,
+                            content: [
+                                ...(html ? [{ type: "text/html", value: html }] : []),
+                                ...(text ? [{ type: "text/plain", value: text }] : [{ type: "text/plain", value: subject }]),
+                            ],
+                        }),
+                        signal: AbortSignal.timeout(10000),
+                    })
+                    if (response.ok || response.status === 202) {
+                        return { messageId: `twilio-sendgrid-${Date.now()}` }
+                    }
+                    console.warn(`Twilio/SendGrid returned ${response.status}. Falling back to primary SMTP...`)
+                }
+            }
+            */
+
+            if (provider !== "smtp" && provider !== "brevo" && provider !== "twilio" && provider !== "sendgrid") {
+                console.warn(`Unsupported MAIL_PROVIDER (${provider}). Falling back to smtp.`)
+            }
 
             const user = (config.smtp.user || "").trim()
             const pass = (config.smtp.pass || "").trim().replace(/\s+/g, "")
             if (!user || !pass) {
-                if (config.env === "production") return { error: "Email delivery is not configured. Set SMTP_USER and SMTP_PASSWORD or configure Brevo." }
+                if (config.env === "production") return { error: "Email delivery is not configured. Set SMTP_USER and SMTP_PASSWORD or configure Twilio/Brevo." }
                 return { messageId: `simulated-${Date.now()}`, simulated: true }
             }
 
@@ -53,9 +88,9 @@ export const createMailSender = (config, { createTransport, fetchImpl = globalTh
                 socketTimeout: 6000,
             })
             return await transporter.sendMail({
-                from: { name: config.appName, address: fromEmail },
+                from: { name: config.appName, address: fromEmail || user },
                 to: email,
-                replyTo: fromEmail,
+                replyTo: fromEmail || user,
                 subject,
                 html,
                 text,

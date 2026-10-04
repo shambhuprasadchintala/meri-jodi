@@ -30,7 +30,7 @@ const formatZodError = (validation) => {
 /**
  * POST /api/auth/register
  * Register a new user:
- * Validates input, hashes password, stores pending user in Redis (5 min), and sends verification email via Nodemailer.
+ * Validates input, hashes password, stores pending user in Redis (10 min), and sends 6-digit SMS OTP via Twilio Verify.
  */
 router.post("/register", sanitizeBody, async (req, res) => {
     const apiResponse = new ApiResponse(res)
@@ -63,26 +63,28 @@ router.post("/register", sanitizeBody, async (req, res) => {
 /**
  * GET /api/auth/verify/:token
  * POST /api/auth/verify/:token
- * Verify email verification token from Redis, create user + profile in MongoDB, issue tokens & set cookies.
+ * POST /api/auth/verify-registration
+ * Verify SMS OTP or registration token from Redis, create user + profile in MongoDB, issue dual tokens & set cookies.
  */
-const handleEmailVerification = async (req, res) => {
+const handleRegistrationVerification = async (req, res) => {
     const apiResponse = new ApiResponse(res)
     try {
         const token = req.params.token || req.body?.token || req.body?.otp || req.body?.code
-        const email = req.body?.email || req.query?.email
+        const emailOrPhone = req.body?.phone || req.body?.mobile || req.body?.email || req.query?.phone || req.query?.email
         if (!token) {
-            return apiResponse.error("Verification token or code is missing", 400)
+            return apiResponse.error("Verification code or token is required", 400)
         }
 
-        const result = await authService.verifyEmailToken(token, res, email)
+        const result = await authService.verifyEmailToken(token, res, emailOrPhone)
         return apiResponse.success(result, result.message, 200)
     } catch (error) {
         return apiResponse.error(error.message, error.statusCode || 400)
     }
 }
 
-router.get("/verify/:token", sanitizeBody, handleEmailVerification)
-router.post("/verify/:token", sanitizeBody, handleEmailVerification)
+router.get("/verify/:token", sanitizeBody, handleRegistrationVerification)
+router.post("/verify/:token", sanitizeBody, handleRegistrationVerification)
+router.post("/verify-registration", sanitizeBody, handleRegistrationVerification)
 
 /**
  * POST /api/auth/admin-login
@@ -106,7 +108,7 @@ router.post("/admin-login", sanitizeBody, async (req, res) => {
 /**
  * POST /api/auth/login
  * Step 1 of Login:
- * Validates email & password, generates 6-digit OTP, stores in Redis (5 min), and sends email via Nodemailer.
+ * Validates phone / email & password, generates 6-digit OTP, stores in Redis, and sends SMS OTP via Twilio Verify.
  */
 router.post("/login", sanitizeBody, async (req, res) => {
     const apiResponse = new ApiResponse(res)
@@ -117,10 +119,16 @@ router.post("/login", sanitizeBody, async (req, res) => {
             return apiResponse.error(errorDetails.message, 400)
         }
 
-        const { email, password } = validation.data
+        const { phone, email, identifier, password } = validation.data
         const reqIp = req.ip || req.connection?.remoteAddress || "127.0.0.1"
 
-        const result = await authService.loginUser({ email, password, reqIp })
+        const result = await authService.loginUser({
+            phone: phone || req.body?.phone || req.body?.mobile,
+            email: email || req.body?.email,
+            identifier: identifier || req.body?.identifier,
+            password,
+            reqIp,
+        })
         return apiResponse.success(result, result.message, 200)
     } catch (error) {
         return apiResponse.error(error.message, error.statusCode || 400)
@@ -130,28 +138,31 @@ router.post("/login", sanitizeBody, async (req, res) => {
 /**
  * POST /api/auth/verify
  * POST /api/auth/verify-otp
- * Step 2 of Login:
- * Verifies OTP from Redis, issues dual JWT tokens (Access + Refresh), sets HTTP-only cookies, and returns user.
+ * Step 2 of Login / Registration:
+ * Verifies SMS OTP via Twilio Verify / Redis, issues dual JWT tokens (Access + Refresh), sets HTTP-only cookies, and returns user.
  */
 const handleVerifyOtp = async (req, res) => {
     const apiResponse = new ApiResponse(res)
     try {
-        // If request provides token or code without email, resolve via email verification handler
-        if (req.body?.token || (req.body?.code && !req.body?.email)) {
-            const token = req.body.token || req.body.code
-            const result = await authService.verifyEmailToken(token, res, req.body.email)
-            return apiResponse.success(result, result.message, 200)
+        const phone = req.body?.phone || req.body?.mobile
+        const email = req.body?.email
+        const otp = req.body?.otp || req.body?.code || req.body?.token
+
+        if (!otp) {
+            return apiResponse.error("Verification code is required", 400)
         }
 
-        const validation = verifyOtpSchema.safeParse(req.body)
-        const errorDetails = formatZodError(validation)
-        if (errorDetails) {
-            return apiResponse.error(errorDetails.message, 400)
+        // If request provides token or phone without password login state, attempt registration verification first
+        if (req.body?.token || (phone && !email)) {
+            try {
+                const regResult = await authService.verifyEmailToken(otp, res, phone || email)
+                return apiResponse.success(regResult, regResult.message, 200)
+            } catch (_err) {
+                // If not pending registration, proceed to login verification
+            }
         }
 
-        const { email, otp } = validation.data
-        const result = await authService.verifyLoginOtp({ email, otp, res })
-
+        const result = await authService.verifyLoginOtp({ phone, email, otp, res })
         return apiResponse.success(result, result.message, 200)
     } catch (error) {
         return apiResponse.error(error.message, error.statusCode || 400)
@@ -163,7 +174,7 @@ router.post("/verify-otp", sanitizeBody, handleVerifyOtp)
 
 /**
  * POST /api/auth/resend-otp
- * Resend OTP code to email with 60s rate limit.
+ * Resend SMS OTP code to phone via Twilio Verify with 30s rate limit.
  */
 router.post("/resend-otp", sanitizeBody, async (req, res) => {
     const apiResponse = new ApiResponse(res)
@@ -174,10 +185,14 @@ router.post("/resend-otp", sanitizeBody, async (req, res) => {
             return apiResponse.error(errorDetails.message, 400)
         }
 
-        const { email } = validation.data
+        const { phone, email } = validation.data
         const reqIp = req.ip || req.connection?.remoteAddress || "127.0.0.1"
 
-        const result = await authService.resendLoginOtp({ email, reqIp })
+        const result = await authService.resendLoginOtp({
+            phone: phone || req.body?.phone || req.body?.mobile,
+            email: email || req.body?.email,
+            reqIp,
+        })
         return apiResponse.success(result, result.message, 200)
     } catch (error) {
         return apiResponse.error(error.message, error.statusCode || 400)
@@ -263,7 +278,7 @@ router.get("/me", authenticate, attachUser, async (req, res) => {
 
 /**
  * POST /api/auth/forgot-password
- * Request a password reset link via email.
+ * Request a password reset code.
  */
 router.post("/forgot-password", sanitizeBody, async (req, res) => {
     const apiResponse = new ApiResponse(res)
@@ -281,36 +296,23 @@ router.post("/forgot-password", sanitizeBody, async (req, res) => {
 
 /**
  * POST /api/auth/reset-password/:token
- * Reset password using the token from the email link.
- */
-router.post("/reset-password/:token", sanitizeBody, async (req, res) => {
-    const apiResponse = new ApiResponse(res)
-    try {
-        const { token } = req.params
-        const { newPassword, password } = req.body
-        const result = await authService.resetPassword({ token, newPassword: newPassword || password })
-        return apiResponse.success(result, result.message, 200)
-    } catch (error) {
-        return apiResponse.error(error.message, error.statusCode || 400)
-    }
-})
-
-/**
  * POST /api/auth/reset-password
  * Reset password using token or 6-digit OTP code in request body.
  */
-router.post("/reset-password", sanitizeBody, async (req, res) => {
+const handleResetPassword = async (req, res) => {
     const apiResponse = new ApiResponse(res)
     try {
-        const { token, code, otp, newPassword, password } = req.body
-        const tokenToUse = token || code || otp
-        const passToUse = newPassword || password
-        const result = await authService.resetPassword({ token: tokenToUse, newPassword: passToUse })
+        const token = req.params.token || req.body?.token || req.body?.code || req.body?.otp
+        const newPassword = req.body?.newPassword || req.body?.password
+        const result = await authService.resetPassword({ token, newPassword })
         return apiResponse.success(result, result.message, 200)
     } catch (error) {
         return apiResponse.error(error.message, error.statusCode || 400)
     }
-})
+}
+
+router.post("/reset-password/:token", sanitizeBody, handleResetPassword)
+router.post("/reset-password", sanitizeBody, handleResetPassword)
 
 /**
  * PUT /api/auth/change-password

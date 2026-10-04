@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { useNavigate, useLocation, Link } from "react-router-dom"
-import { Eye, EyeOff } from "lucide-react"
+import { Eye, EyeOff, Smartphone, ShieldCheck } from "lucide-react"
 import { registerUser, verifyEmailToken, googleAuth } from "../api/authApi"
 import { useAuth } from "../context/AuthContext"
 import logo from "../assets/logo2.png"
@@ -22,6 +22,7 @@ const SignUpPage = () => {
     const [phone, setPhone] = useState("")
     const [error, setError] = useState("")
     const [successMsg, setSuccessMsg] = useState("")
+    const [sentPhone, setSentPhone] = useState("")
     const [loading, setLoading] = useState(false)
     const [otpInput, setOtpInput] = useState("")
     const [verifyingOtp, setVerifyingOtp] = useState(false)
@@ -46,16 +47,16 @@ const SignUpPage = () => {
     }, [successMsg, resendTimer, canResend])
 
     const handleSubmit = async (e) => {
-        e.preventDefault()
+        if (e?.preventDefault) e.preventDefault()
         setError("")
         setSuccessMsg("")
 
-        if (!name.trim() || !email.trim() || !password || !phone.trim()) {
-            setError("Please fill in all required fields.")
+        if (!name.trim() || !password || !phone.trim()) {
+            setError("Please fill in your name, mobile number, and password.")
             return
         }
 
-        const cleanPhone = phone.trim()
+        const cleanPhone = phone.trim().replace(/\D/g, "")
         if (cleanPhone.length < 10) {
             setError("Please enter a valid 10-digit mobile number.")
             return
@@ -68,37 +69,43 @@ const SignUpPage = () => {
 
         setLoading(true)
         try {
-            const formattedPhone = cleanPhone.startsWith("+") ? cleanPhone : `+91${cleanPhone}`
+            const formattedPhone = cleanPhone.startsWith("91") && cleanPhone.length === 12
+                ? `+${cleanPhone}`
+                : `+91${cleanPhone}`
+
             const data = await registerUser({
                 name: name.trim(),
-                email: email.trim(),
+                email: email.trim() || undefined,
                 password,
                 gender,
                 location: locationCity.trim() || undefined,
                 phone: formattedPhone,
             })
             setOtpInput("")
+            setSentPhone(formattedPhone)
             setSuccessMsg(
                 data.message ||
-                    "Registration successful! We have sent a verification code to your email. Please check your inbox."
+                    `A 6-digit verification code has been sent to ${formattedPhone} via SMS.`
             )
+            setResendTimer(60)
+            setCanResend(false)
         } catch (err) {
-            setError(err.response?.data?.message || "Registration failed. Please try again.")
+            setError(err.response?.data?.message || "Registration failed. Please check your details and try again.")
         } finally {
             setLoading(false)
         }
     }
 
     const handleOtpVerify = async (e) => {
-        e.preventDefault()
+        if (e?.preventDefault) e.preventDefault()
         setOtpError("")
-        if (!otpInput.trim()) {
-            setOtpError("Please enter your 6-digit verification code.")
+        if (!otpInput.trim() || otpInput.trim().length !== 6) {
+            setOtpError("Please enter the complete 6-digit SMS verification code.")
             return
         }
         setVerifyingOtp(true)
         try {
-            const data = await verifyEmailToken(otpInput.trim())
+            const data = await verifyEmailToken(otpInput.trim(), sentPhone || phone)
             try {
                 localStorage.removeItem("merijodi_draft_profile")
                 localStorage.removeItem("merijodi_draft_step")
@@ -107,7 +114,7 @@ const SignUpPage = () => {
             signIn(data.token || data.accessToken, data.user)
             navigate("/complete-profile")
         } catch (err) {
-            setOtpError(err.response?.data?.message || "Invalid or expired verification code.")
+            setOtpError(err.response?.data?.message || "Invalid or expired verification code. Please request a new code.")
         } finally {
             setVerifyingOtp(false)
         }
@@ -167,7 +174,7 @@ const SignUpPage = () => {
                         Begin Your Search for a Soulmate.
                     </h2>
                     <p className="text-[#6B7280] text-base leading-relaxed">
-                        Create your profile in minutes, get verified, and find compatible life partners across India.
+                        Create your profile in minutes, verify your mobile number with Twilio SMS OTP, and find compatible life partners across India.
                     </p>
                 </div>
                 <div className="text-xs text-[#9CA3AF]">
@@ -188,54 +195,27 @@ const SignUpPage = () => {
                             Create Your Account
                         </h1>
                         <p className="text-sm text-[#6B7280]">
-                            Join thousands of happy couples who found love on MeriJodi.
+                            Join thousands of verified members on India's most trusted matrimony platform.
                         </p>
                     </div>
 
                     {successMsg ? (
-                        <div className="bg-white p-8 rounded-2xl shadow-lg border border-green-200 text-center space-y-5">
-                            <div className="w-14 h-14 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-2xl mx-auto">
-                                ✉️
+                        <div className="bg-white p-8 rounded-2xl shadow-lg border border-rose-100 text-center space-y-5">
+                            <div className="w-14 h-14 bg-rose-50 text-[#ED5463] rounded-full flex items-center justify-center text-2xl mx-auto shadow-inner">
+                                <Smartphone className="w-7 h-7 text-[#ED5463]" />
                             </div>
                             <div>
-                                <h3 className="text-xl font-bold text-gray-900 font-serif mb-1">Check Your Email</h3>
+                                <h3 className="text-xl font-bold text-gray-900 font-serif mb-1">Verify Mobile Number</h3>
                                 <p className="text-sm text-gray-600 leading-relaxed">
-                                    We sent a 6-digit verification code and link to{" "}
-                                    <strong className="text-gray-900">{email}</strong>.
+                                    We sent a 6-digit SMS verification code to{" "}
+                                    <strong className="text-gray-900 font-semibold">{sentPhone || phone}</strong>.
                                 </p>
                             </div>
 
-                            {/* Direct Open Gmail Button */}
-                            <div className="flex flex-col sm:flex-row gap-2.5 justify-center items-center">
-                                <a
-                                    href="https://mail.google.com"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-6 py-2.5 bg-[#EA4335] hover:bg-[#D33828] text-white text-sm font-semibold rounded-full shadow-sm hover:shadow-md transition-all cursor-pointer"
-                                >
-                                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                                        <path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z"/>
-                                    </svg>
-                                    Open Gmail Inbox ↗
-                                </a>
-                                {!email.toLowerCase().endsWith("@gmail.com") && (
-                                    <a
-                                        href="https://outlook.live.com"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-xs font-semibold rounded-full shadow-2xs transition-all cursor-pointer"
-                                    >
-                                        Open Outlook / Webmail ↗
-                                    </a>
-                                )}
-                            </div>
-
-
-
                             {/* Standardized 6-Digit OTP Box Input */}
-                            <form onSubmit={handleOtpVerify} className="p-5 bg-white rounded-2xl border border-rose-100 shadow-sm space-y-4">
+                            <form onSubmit={handleOtpVerify} className="p-5 bg-[#FAF8F5] rounded-2xl border border-rose-100 shadow-xs space-y-4">
                                 <label className="block text-xs font-bold text-[#842029] uppercase tracking-wider text-center">
-                                    Enter 6-Digit Verification Code
+                                    Enter 6-Digit SMS Code
                                 </label>
                                 
                                 <OtpBoxInput
@@ -250,14 +230,14 @@ const SignUpPage = () => {
                                 )}
 
                                 <div className="text-center text-xs text-[#6B7280]">
-                                    Didn't receive the code?{" "}
+                                    Didn't receive SMS?{" "}
                                     {canResend ? (
                                         <button
                                             type="button"
                                             onClick={handleSubmit}
-                                            className="text-[#ED5463] font-bold hover:underline"
+                                            className="text-[#ED5463] font-bold hover:underline cursor-pointer"
                                         >
-                                            Resend Code
+                                            Resend SMS Code
                                         </button>
                                     ) : (
                                         <span className="font-semibold text-gray-500">Resend in {resendTimer}s</span>
@@ -267,9 +247,10 @@ const SignUpPage = () => {
                                 <button
                                     type="submit"
                                     disabled={String(otpInput || "").length !== 6 || verifyingOtp}
-                                    className="w-full rounded-full bg-[#ED5463] py-3 text-white font-semibold text-sm hover:bg-[#D4384B] disabled:opacity-50 transition-all shadow-sm cursor-pointer"
+                                    className="w-full rounded-full bg-[#ED5463] py-3 text-white font-semibold text-sm hover:bg-[#D4384B] disabled:opacity-50 transition-all shadow-sm cursor-pointer flex items-center justify-center gap-2"
                                 >
-                                    {verifyingOtp ? "Verifying Code..." : "Verify Code & Start Setup →"}
+                                    <ShieldCheck className="w-4 h-4" />
+                                    {verifyingOtp ? "Verifying SMS Code..." : "Verify Code & Start Setup →"}
                                 </button>
                             </form>
 
@@ -283,7 +264,7 @@ const SignUpPage = () => {
                                     }}
                                     className="text-gray-500 hover:text-gray-800 underline cursor-pointer"
                                 >
-                                    ← Change Email
+                                    ← Change Number
                                 </button>
                                 <span className="text-gray-400">
                                     Already verified?{" "}
@@ -318,16 +299,22 @@ const SignUpPage = () => {
 
                                 <div>
                                     <label className="block text-xs font-semibold text-gray-700 mb-1 uppercase tracking-wider">
-                                        Email Address *
+                                        Mobile Number (for SMS OTP) *
                                     </label>
-                                    <input
-                                        type="email"
-                                        placeholder="you@example.com"
-                                        value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
-                                        className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm focus:border-[#ED5463] focus:ring-2 focus:ring-[#ED5463]/20 focus:outline-none transition-all"
-                                        required
-                                    />
+                                    <div className="relative">
+                                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400 text-sm font-medium">
+                                            +91
+                                        </div>
+                                        <input
+                                            type="tel"
+                                            placeholder="9876543210"
+                                            value={phone}
+                                            onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
+                                            maxLength={10}
+                                            required
+                                            className="w-full rounded-xl border border-gray-300 pl-12 pr-4 py-2.5 text-sm focus:border-[#ED5463] focus:ring-2 focus:ring-[#ED5463]/20 focus:outline-none transition-all"
+                                        />
+                                    </div>
                                 </div>
 
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -362,22 +349,20 @@ const SignUpPage = () => {
 
                                 <div>
                                     <label className="block text-xs font-semibold text-gray-700 mb-1 uppercase tracking-wider">
-                                        Mobile Number *
+                                        Email Address (Optional)
                                     </label>
                                     <input
-                                        type="tel"
-                                        placeholder="9876543210"
-                                        value={phone}
-                                        onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
-                                        maxLength={10}
-                                        required
+                                        type="email"
+                                        placeholder="you@example.com (optional)"
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
                                         className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm focus:border-[#ED5463] focus:ring-2 focus:ring-[#ED5463]/20 focus:outline-none transition-all"
                                     />
                                 </div>
 
                                 <div>
                                     <label className="block text-xs font-semibold text-gray-700 mb-1 uppercase tracking-wider">
-                                        Password *
+                                        Create Password *
                                     </label>
                                     <div className="relative">
                                         <input
@@ -402,9 +387,10 @@ const SignUpPage = () => {
                                 <button
                                     type="submit"
                                     disabled={loading}
-                                    className="w-full rounded-full bg-[#ED5463] py-3.5 text-white font-semibold text-sm shadow-md hover:bg-[#D4384B] hover:shadow-lg transition-all duration-200 disabled:opacity-60 mt-2"
+                                    className="w-full rounded-full bg-[#ED5463] py-3.5 text-white font-semibold text-sm shadow-md hover:bg-[#D4384B] hover:shadow-lg transition-all duration-200 disabled:opacity-60 mt-2 cursor-pointer flex items-center justify-center gap-2"
                                 >
-                                    {loading ? "Creating account..." : "Register with Email"}
+                                    <Smartphone className="w-4 h-4" />
+                                    {loading ? "Sending SMS Code..." : "Register with Mobile (SMS OTP)"}
                                 </button>
                             </form>
 
@@ -422,7 +408,7 @@ const SignUpPage = () => {
                                 type="button"
                                 onClick={handleGoogleRegister}
                                 disabled={loading}
-                                className="w-full flex items-center justify-center gap-3 rounded-full border border-gray-300 bg-white py-3 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 disabled:opacity-60"
+                                className="w-full flex items-center justify-center gap-3 rounded-full border border-gray-300 bg-white py-3 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 disabled:opacity-60 cursor-pointer"
                             >
                                 <svg className="w-4 h-4" viewBox="0 0 24 24">
                                     <path

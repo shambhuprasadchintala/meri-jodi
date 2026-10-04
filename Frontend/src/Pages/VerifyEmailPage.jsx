@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext"
 import { verifyEmailToken } from "../api/authApi"
 import logo from "../assets/logo2.png"
 import OtpBoxInput from "../Components/OtpBoxInput"
+import { Smartphone, ShieldCheck } from "lucide-react"
 
 const VerifyEmailPage = () => {
     const { token: routeToken } = useParams()
@@ -12,6 +13,7 @@ const VerifyEmailPage = () => {
     const { signIn } = useAuth()
 
     const token = routeToken || searchParams.get("token") || searchParams.get("code") || ""
+    const phone = searchParams.get("phone") || searchParams.get("mobile") || ""
 
     const [status, setStatus] = useState(token ? "verifying" : "input") // 'verifying' | 'success' | 'error' | 'input'
     const [message, setMessage] = useState("")
@@ -23,20 +25,20 @@ const VerifyEmailPage = () => {
         setSubmitting(true)
         setStatus("verifying")
         try {
-            const data = await verifyEmailToken(tokenToVerify)
+            const data = await verifyEmailToken(tokenToVerify, phone)
             setStatus("success")
-            setMessage(data.message || "Your email has been verified successfully!")
+            setMessage(data.message || "Your account has been verified successfully!")
             if (data.token || data.accessToken) {
                 signIn(data.token || data.accessToken, data.user)
             }
             setTimeout(() => {
                 navigate("/complete-profile")
-            }, 2500)
+            }, 2000)
         } catch (err) {
             setStatus("error")
             setMessage(
                 err.response?.data?.message ||
-                    "Verification link or code has expired or is invalid. Please enter your 6-digit code or sign up again."
+                    "Verification code or link has expired or is invalid. Please enter your 6-digit SMS code or register again."
             )
         } finally {
             setSubmitting(false)
@@ -69,7 +71,7 @@ const VerifyEmailPage = () => {
                 {status === "verifying" && (
                     <div className="py-8">
                         <div className="w-14 h-14 border-4 border-[#FFE4E8] border-t-[#ED5463] rounded-full animate-spin mx-auto mb-6"></div>
-                        <h2 className="text-xl font-bold text-gray-900 mb-2 font-serif">Verifying Your Email...</h2>
+                        <h2 className="text-xl font-bold text-gray-900 mb-2 font-serif">Verifying Code...</h2>
                         <p className="text-sm text-[#6B7280]">
                             Please hold on while we verify your account credentials.
                         </p>
@@ -86,8 +88,9 @@ const VerifyEmailPage = () => {
                         <p className="text-xs text-[#9CA3AF] mb-6">Redirecting to profile setup in a few seconds...</p>
                         <button
                             onClick={() => navigate("/complete-profile")}
-                            className="w-full rounded-full bg-[#ED5463] py-3 text-white font-semibold text-sm hover:bg-[#D4384B] transition-all shadow-md cursor-pointer"
+                            className="w-full rounded-full bg-[#ED5463] py-3 text-white font-semibold text-sm hover:bg-[#D4384B] transition-all shadow-md cursor-pointer flex items-center justify-center gap-2"
                         >
+                            <ShieldCheck className="w-4 h-4" />
                             Continue to Profile Setup →
                         </button>
                     </div>
@@ -106,36 +109,14 @@ const VerifyEmailPage = () => {
                         ) : (
                             <div className="mb-6">
                                 <div className="w-14 h-14 bg-[#FFF0F2] text-[#ED5463] rounded-full flex items-center justify-center text-2xl mx-auto mb-3">
-                                    ✉️
+                                    <Smartphone className="w-7 h-7 text-[#ED5463]" />
                                 </div>
                                 <h2 className="text-xl font-bold text-gray-900 mb-2 font-serif">Verify Your Account</h2>
                                 <p className="text-xs text-[#6B7280] mb-4">
-                                    Please enter the 6-digit verification code sent to your email.
+                                    Please enter the 6-digit SMS verification code sent to your mobile phone.
                                 </p>
                             </div>
                         )}
-
-                        <div className="flex justify-center gap-2 mb-6">
-                            <a
-                                href="https://mail.google.com"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-rose-50 text-[#ED5463] hover:bg-[#ED5463] hover:text-white border border-[#ED5463]/30 transition-all shadow-xs"
-                            >
-                                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
-                                </svg>
-                                Open Gmail Inbox ↗
-                            </a>
-                            <a
-                                href="https://outlook.live.com"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200 transition-all"
-                            >
-                                Open Webmail ↗
-                            </a>
-                        </div>
 
                         <form onSubmit={handleManualSubmit} className="space-y-4">
                             <OtpBoxInput
@@ -147,9 +128,10 @@ const VerifyEmailPage = () => {
                             <button
                                 type="submit"
                                 disabled={String(manualCode || "").length !== 6 || submitting}
-                                className="w-full rounded-full bg-[#ED5463] py-3 text-white font-semibold text-sm hover:bg-[#D4384B] disabled:opacity-50 transition-all shadow-md cursor-pointer"
+                                className="w-full rounded-full bg-[#ED5463] py-3 text-white font-semibold text-sm hover:bg-[#D4384B] disabled:opacity-50 transition-all shadow-md cursor-pointer flex items-center justify-center gap-2"
                             >
-                                {submitting ? "Verifying..." : "Verify Code →"}
+                                <ShieldCheck className="w-4 h-4" />
+                                {submitting ? "Verifying..." : "Verify SMS Code →"}
                             </button>
                         </form>
 

@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react"
 import { useNavigate, Link } from "react-router-dom"
-import { Eye, EyeOff } from "lucide-react"
+import { Eye, EyeOff, Smartphone, ShieldCheck } from "lucide-react"
 import { useAuth } from "../context/AuthContext"
-import { loginWithEmail, verifyLoginOtp, resendLoginOtp, googleAuth } from "../api/authApi"
+import { loginWithCredentials, verifyLoginOtp, resendLoginOtp, googleAuth } from "../api/authApi"
 import logo from "../assets/logo2.png"
 import OtpBoxInput from "../Components/OtpBoxInput"
 
@@ -17,7 +17,8 @@ const LoginPage = () => {
     }, [isAuth, navigate])
 
     const [step, setStep] = useState("credentials") // 'credentials' | 'otp'
-    const [email, setEmail] = useState("")
+    const [identifier, setIdentifier] = useState("")
+    const [targetPhone, setTargetPhone] = useState("")
     const [password, setPassword] = useState("")
     const [showPassword, setShowPassword] = useState(false)
     const [otp, setOtp] = useState("")
@@ -65,6 +66,7 @@ const LoginPage = () => {
         }
         googleLoginHook()
     }
+
     useEffect(() => {
         let timer
         if (step === "otp" && resendTimer > 0 && !canResend) {
@@ -81,27 +83,34 @@ const LoginPage = () => {
         return () => clearInterval(timer)
     }, [step, resendTimer, canResend])
 
-    // Step 1: Submit email & password
+    // Step 1: Submit credentials
     const handleCredentialsSubmit = async (e) => {
-        e.preventDefault()
+        if (e?.preventDefault) e.preventDefault()
         setError("")
         setInfoMsg("")
 
-        if (!email.trim() || !password) {
-            setError("Please enter your email and password.")
+        const cleanInput = identifier.trim()
+        if (!cleanInput || !password) {
+            setError("Please enter your mobile number (or email) and password.")
             return
         }
 
         setLoading(true)
         try {
-            const data = await loginWithEmail(email.trim(), password)
-            setInfoMsg(data.message || "Verification code sent to your email.")
+            const data = await loginWithCredentials({
+                phone: cleanInput.includes("@") ? undefined : cleanInput,
+                email: cleanInput.includes("@") ? cleanInput : undefined,
+                identifier: cleanInput,
+                password,
+            })
+            setTargetPhone(data.phone || cleanInput)
+            setInfoMsg(data.message || `A 6-digit SMS verification code has been sent to ${data.phone || cleanInput}.`)
             setOtp("")
             setStep("otp")
             setResendTimer(60)
             setCanResend(false)
         } catch (err) {
-            setError(err.response?.data?.message || "Invalid email or password.")
+            setError(err.response?.data?.message || "Invalid credentials. Please check your details.")
         } finally {
             setLoading(false)
         }
@@ -113,13 +122,18 @@ const LoginPage = () => {
         setError("")
         const otpCode = String(otp || "").trim()
         if (otpCode.length !== 6) {
-            setError("Please enter the complete 6-digit verification code.")
+            setError("Please enter the complete 6-digit SMS verification code.")
             return
         }
 
         setLoading(true)
         try {
-            const data = await verifyLoginOtp({ email: email.trim(), otp: otpCode })
+            const cleanInput = identifier.trim()
+            const data = await verifyLoginOtp({
+                phone: cleanInput.includes("@") ? targetPhone : cleanInput,
+                email: cleanInput.includes("@") ? cleanInput : undefined,
+                otp: otpCode,
+            })
             try {
                 localStorage.removeItem("merijodi_draft_profile")
                 localStorage.removeItem("merijodi_draft_step")
@@ -139,12 +153,16 @@ const LoginPage = () => {
         setError("")
         setLoading(true)
         try {
-            await resendLoginOtp(email.trim())
-            setInfoMsg("A new verification code has been sent to your email.")
+            const cleanInput = identifier.trim()
+            await resendLoginOtp({
+                phone: cleanInput.includes("@") ? targetPhone : cleanInput,
+                email: cleanInput.includes("@") ? cleanInput : undefined,
+            })
+            setInfoMsg(`A new verification code has been sent to ${targetPhone || cleanInput} via SMS.`)
             setResendTimer(60)
             setCanResend(false)
         } catch (err) {
-            setError(err.response?.data?.message || "Unable to resend code right now.")
+            setError(err.response?.data?.message || "Unable to resend SMS code right now.")
         } finally {
             setLoading(false)
         }
@@ -165,7 +183,7 @@ const LoginPage = () => {
                         Where Trusted Indian Matrimony Begins.
                     </h2>
                     <p className="text-[#6B7280] text-base leading-relaxed">
-                        Connect with verified profiles, find your ideal partner, and embark on a beautiful lifelong journey.
+                        Connect with verified profiles, verify via secure SMS OTP with Twilio, and find your ideal partner.
                     </p>
                 </div>
                 <div className="text-xs text-[#9CA3AF]">
@@ -183,14 +201,14 @@ const LoginPage = () => {
                     </div>
 
                     {step === "credentials" ? (
-                        /* STEP 1: Email & Password */
+                        /* STEP 1: Mobile / Email & Password */
                         <div>
                             <div className="mb-8">
                                 <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 font-serif">
                                     Welcome Back
                                 </h1>
                                 <p className="text-sm text-[#6B7280]">
-                                    Sign in with your email address to access your MeriJodi account.
+                                    Sign in with your mobile number to receive a secure SMS OTP.
                                 </p>
                             </div>
 
@@ -203,13 +221,13 @@ const LoginPage = () => {
                             <form onSubmit={handleCredentialsSubmit} className="space-y-4">
                                 <div>
                                     <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wider">
-                                        Email Address
+                                        Mobile Number or Email
                                     </label>
                                     <input
-                                        type="email"
-                                        placeholder="you@example.com"
-                                        value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
+                                        type="text"
+                                        placeholder="e.g. 9876543210 or you@example.com"
+                                        value={identifier}
+                                        onChange={(e) => setIdentifier(e.target.value)}
                                         className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:border-[#ED5463] focus:ring-2 focus:ring-[#ED5463]/20 focus:outline-none transition-all"
                                         required
                                     />
@@ -247,9 +265,10 @@ const LoginPage = () => {
                                 <button
                                     type="submit"
                                     disabled={loading}
-                                    className="w-full rounded-full bg-[#ED5463] py-3.5 text-white font-semibold text-sm shadow-md hover:bg-[#D4384B] hover:shadow-lg transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed mt-2"
+                                    className="w-full rounded-full bg-[#ED5463] py-3.5 text-white font-semibold text-sm shadow-md hover:bg-[#D4384B] hover:shadow-lg transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed mt-2 cursor-pointer flex items-center justify-center gap-2"
                                 >
-                                    {loading ? "Sending verification code..." : "Sign In with Email"}
+                                    <Smartphone className="w-4 h-4" />
+                                    {loading ? "Sending SMS OTP..." : "Sign In & Get SMS OTP"}
                                 </button>
                             </form>
 
@@ -268,7 +287,7 @@ const LoginPage = () => {
                                 type="button"
                                 onClick={handleGoogleLogin}
                                 disabled={loading}
-                                className="w-full flex items-center justify-center gap-3 rounded-full border border-gray-300 bg-white py-3 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 disabled:opacity-60"
+                                className="w-full flex items-center justify-center gap-3 rounded-full border border-gray-300 bg-white py-3 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 disabled:opacity-60 cursor-pointer"
                             >
                                 <svg className="w-4 h-4" viewBox="0 0 24 24">
                                     <path
@@ -300,42 +319,24 @@ const LoginPage = () => {
                             </div>
                         </div>
                     ) : (
-                        /* STEP 2: Enter Email OTP */
+                        /* STEP 2: Enter SMS OTP */
                         <div>
                             <div className="mb-6">
                                 <button
                                     onClick={() => setStep("credentials")}
-                                    className="text-xs text-[#6B7280] hover:text-gray-900 font-medium mb-4 flex items-center gap-1.5 transition-colors"
+                                    className="text-xs text-[#6B7280] hover:text-gray-900 font-medium mb-4 flex items-center gap-1.5 transition-colors cursor-pointer"
                                 >
                                     ← Back to Sign In
                                 </button>
-                                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 font-serif">
-                                    Enter Security Code
-                                </h1>
-                                <p className="text-sm text-[#6B7280]">
-                                    We sent a 6-digit verification code to <span className="font-semibold text-gray-800">{email}</span>.
-                                </p>
-                                <div className="mt-3 flex flex-wrap gap-2">
-                                    <a
-                                        href="https://mail.google.com"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-rose-50 text-[#ED5463] hover:bg-[#ED5463] hover:text-white border border-[#ED5463]/30 transition-all shadow-xs"
-                                    >
-                                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
-                                            <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
-                                        </svg>
-                                        Open Gmail Inbox ↗
-                                    </a>
-                                    <a
-                                        href="https://outlook.live.com"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200 transition-all"
-                                    >
-                                        Open Webmail ↗
-                                    </a>
+                                <div className="w-12 h-12 bg-rose-50 text-[#ED5463] rounded-full flex items-center justify-center mb-4 mx-auto">
+                                    <Smartphone className="w-6 h-6 text-[#ED5463]" />
                                 </div>
+                                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 font-serif text-center">
+                                    Enter SMS Code
+                                </h1>
+                                <p className="text-sm text-[#6B7280] text-center">
+                                    We sent a 6-digit verification code to <span className="font-semibold text-gray-800">{targetPhone || identifier}</span> via SMS.
+                                </p>
                             </div>
 
                             {infoMsg && (
@@ -359,14 +360,14 @@ const LoginPage = () => {
                                 />
 
                                 <div className="text-center text-xs sm:text-sm text-[#6B7280]">
-                                    Didn't receive the code?{" "}
+                                    Didn't receive SMS?{" "}
                                     {canResend ? (
                                         <button
                                             type="button"
                                             onClick={handleResendOtp}
-                                            className="text-[#ED5463] font-bold hover:underline"
+                                            className="text-[#ED5463] font-bold hover:underline cursor-pointer"
                                         >
-                                            Resend Code
+                                            Resend SMS Code
                                         </button>
                                     ) : (
                                         <span className="font-semibold text-gray-500">Resend in {resendTimer}s</span>
@@ -376,9 +377,10 @@ const LoginPage = () => {
                                 <button
                                     type="submit"
                                     disabled={loading || String(otp || "").length !== 6}
-                                    className="w-full rounded-full bg-[#ED5463] py-3.5 text-white font-semibold text-sm shadow-md hover:bg-[#D4384B] hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="w-full rounded-full bg-[#ED5463] py-3.5 text-white font-semibold text-sm shadow-md hover:bg-[#D4384B] hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
                                 >
-                                    {loading ? "Verifying..." : "Verify & Sign In"}
+                                    <ShieldCheck className="w-4 h-4" />
+                                    {loading ? "Verifying SMS Code..." : "Verify & Sign In"}
                                 </button>
                             </form>
                         </div>

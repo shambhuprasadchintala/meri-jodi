@@ -2,7 +2,7 @@ import jwt from "jsonwebtoken"
 import { config } from "../config/config.js"
 import { redisClient } from "../config/redis.js"
 import { User } from "../models/User.js"
-import { USER_STATUS } from "../constants/index.js"
+import { ROLES, USER_STATUS } from "../constants/index.js"
 
 export const authenticate = async (req, res, next) => {
     try {
@@ -97,6 +97,16 @@ export const authenticate = async (req, res, next) => {
 export const attachUser = async (req, res, next) => {
     try {
         if (!req.user && req.userId) {
+            const cacheKey = `user:${req.userId}`
+            const cachedUserJson = await redisClient.get(cacheKey)
+            if (cachedUserJson) {
+                try {
+                    req.user = JSON.parse(cachedUserJson)
+                    return next()
+                } catch (e) {
+                    // fall through
+                }
+            }
             const user = await User.findById(req.userId)
             if (!user) {
                 return res.status(401).json({
@@ -104,7 +114,9 @@ export const attachUser = async (req, res, next) => {
                     message: "User not found",
                 })
             }
-            req.user = user.toAuthJSON()
+            const authUser = user.toAuthJSON()
+            await redisClient.setEx(cacheKey, 3600, JSON.stringify(authUser))
+            req.user = authUser
         }
         next()
     } catch (error) {
@@ -112,12 +124,20 @@ export const attachUser = async (req, res, next) => {
     }
 }
 
-export const requireAdmin = (req, res, next) => {
-    if (!req.user || req.user.role !== "admin") {
-        return res.status(403).json({
-            success: false,
-            message: "Admin access required",
-        })
+export const requireAdmin = async (req, res, next) => {
+    try {
+        if (!req.user && req.userId) {
+            const user = await User.findById(req.userId)
+            if (user) req.user = user.toAuthJSON()
+        }
+        if (!req.user || (req.user.role !== ROLES.ADMIN && req.user.role !== "admin")) {
+            return res.status(403).json({
+                success: false,
+                message: "Admin access required",
+            })
+        }
+        next()
+    } catch (error) {
+        next(error)
     }
-    next()
 }
