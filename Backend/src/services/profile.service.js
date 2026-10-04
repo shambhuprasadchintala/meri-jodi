@@ -170,18 +170,39 @@ class ProfileService {
             }
         }
 
+        const userUpdates = {}
         if (sanitized.name) {
+            userUpdates.name = sanitized.name.trim()
+        } else {
+            const user = await User.findById(userId)
+            if (user && user.name) sanitized.name = user.name
+        }
+
+        if (normalized.phone || data.phone) {
+            const rawPhone = String(normalized.phone || data.phone).trim()
+            const digits = rawPhone.replace(/\D/g, "")
+            const formattedPhone = rawPhone.startsWith("+")
+                ? rawPhone
+                : digits.length === 10
+                ? `+91${digits}`
+                : rawPhone
+            if (digits.length >= 10) {
+                const phoneInUse = await User.findOne({ phone: formattedPhone, _id: { $ne: userId } })
+                if (!phoneInUse) {
+                    userUpdates.phone = formattedPhone
+                }
+            }
+        }
+
+        if (Object.keys(userUpdates).length > 0) {
             const updatedUser = await User.findByIdAndUpdate(
                 userId,
-                { name: sanitized.name.trim() },
+                userUpdates,
                 { new: true }
             )
             if (updatedUser) {
                 await redisClient.setEx(`user:${userId}`, 3600, JSON.stringify(updatedUser.toAuthJSON()))
             }
-        } else {
-            const user = await User.findById(userId)
-            if (user && user.name) sanitized.name = user.name
         }
 
         const profile = new Profile({ userId, ...sanitized })
@@ -224,10 +245,30 @@ class ProfileService {
             }
         }
 
+        const userUpdates = {}
         if (sanitized.name) {
+            userUpdates.name = sanitized.name.trim()
+        }
+        if (normalized.phone || data.phone) {
+            const rawPhone = String(normalized.phone || data.phone).trim()
+            const digits = rawPhone.replace(/\D/g, "")
+            const formattedPhone = rawPhone.startsWith("+")
+                ? rawPhone
+                : digits.length === 10
+                ? `+91${digits}`
+                : rawPhone
+            if (digits.length >= 10) {
+                const phoneInUse = await User.findOne({ phone: formattedPhone, _id: { $ne: userId } })
+                if (!phoneInUse) {
+                    userUpdates.phone = formattedPhone
+                }
+            }
+        }
+
+        if (Object.keys(userUpdates).length > 0) {
             const updatedUser = await User.findByIdAndUpdate(
                 userId,
-                { name: sanitized.name.trim() },
+                userUpdates,
                 { new: true }
             )
             if (updatedUser) {

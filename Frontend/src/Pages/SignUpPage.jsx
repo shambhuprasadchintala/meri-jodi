@@ -127,10 +127,10 @@ const SignUpPage = () => {
                     localStorage.removeItem("merijodi_draft_userId")
                 } catch (_) {}
                 signIn(data.token || data.accessToken, data.user)
-                if (!data.isNewUser || data.isProfileComplete) {
-                    navigate("/home")
-                } else {
+                if (data.isNewUser || !data.isProfileComplete) {
                     navigate("/complete-profile")
+                } else {
+                    navigate("/home")
                 }
             } catch (err) {
                 setError(err.response?.data?.message || "Google registration failed.")

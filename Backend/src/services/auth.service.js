@@ -16,81 +16,22 @@ import {
     revokeRefreshToken,
 } from "../config/generateToken.js"
 
-/*
- * ==============================================================================
- * TWILIO (SMS OTP) CONFIGURATION & LOGIC - COMMENTED FOR REFERENCE AS REQUESTED
- * ==============================================================================
- * 
- * import twilio from "twilio"
- * 
- * let twilioClient = null
- * if (
- *     config.twilio?.accountSid &&
- *     config.twilio.accountSid.startsWith("AC") &&
- *     config.twilio.authToken
- * ) {
- *     try {
- *         twilioClient = twilio(config.twilio.accountSid, config.twilio.authToken)
- *     } catch (e) {
- *         console.warn("Twilio client initialization failed:", e.message)
- *     }
- * }
- * 
- * async sendOtp(phone) {
- *     if (!twilioClient) {
- *         throw new Error("Twilio not configured")
- *     }
- *     if (!config.twilio.verifyServiceSid) {
- *         throw new Error("Twilio Verify service SID not configured")
- *     }
- *     try {
- *         const verification = await twilioClient.verify.v2
- *             .services(config.twilio.verifyServiceSid)
- *             .verifications.create({ to: phone, channel: "sms" })
- *         return { sid: verification.sid, status: verification.status }
- *     } catch (error) {
- *         console.error("Twilio send OTP error:", error)
- *         throw new Error("Failed to send OTP. Check phone number.")
- *     }
- * }
- * 
- * async verifyOtp(phone, code) {
- *     if (!twilioClient) {
- *         throw new Error("Twilio not configured")
- *     }
- *     if (!config.twilio.verifyServiceSid) {
- *         throw new Error("Twilio Verify service SID not configured")
- *     }
- *     try {
- *         const verificationCheck = await twilioClient.verify.v2
- *             .services(config.twilio.verifyServiceSid)
- *             .verificationChecks.create({ to: phone, code })
- *         return verificationCheck.status === "approved"
- *     } catch (error) {
- *         console.error("Twilio verify OTP error:", error)
- *         return false
- *     }
- * }
- * 
- * async findOrCreateUserByPhone(phone, name) {
- *     let user = await User.findOne({ phone })
- *     if (!user) {
- *         user = await User.create({
- *             phone,
- *             name: name || undefined,
- *             isPhoneVerified: true,
- *             status: USER_STATUS.ACTIVE,
- *         })
- *     } else {
- *         user.isPhoneVerified = true
- *         user.lastLogin = new Date()
- *         if (name && !user.name) user.name = name
- *         await user.save()
- *     }
- *     return user
- * }
- * ==============================================================================
- */
+import twilio from "twilio"
+
+let twilioClient = null
+const getTwilioClient = () => {
+    if (twilioClient) return twilioClient
+    const sid = config.twilio?.accountSid || process.env.TWILIO_ACCOUNT_SID
+    const token = config.twilio?.authToken || process.env.TWILIO_AUTH_TOKEN
+    if (sid && sid.startsWith("AC") && token) {
+        try {
+            twilioClient = twilio(sid, token)
+        } catch (e) {
+            console.warn("Twilio client initialization failed:", e.message)
+        }
+    }
+    return twilioClient
+}
 
 const googleOAuthClient = new OAuth2Client({
     clientId: config.google.clientId || undefined,
@@ -695,11 +636,13 @@ class AuthService {
             )
         }
 
-        // Check if user already has an existing completed profile
+        // Check if user already has an existing completed profile AND mobile number
         const userProfile = await Profile.findOne({ userId: user._id })
+        const hasPhone = Boolean(user.phone && user.phone.trim().length >= 10)
         const isProfileComplete = Boolean(
             userProfile &&
-            (userProfile.profileCompletionPct >= 30 || userProfile.location?.city || userProfile.religion)
+            (userProfile.profileCompletionPct >= 30 || userProfile.location?.city || userProfile.religion) &&
+            hasPhone
         )
 
         // Generate dual tokens and cookies
@@ -716,6 +659,220 @@ class AuthService {
             refreshToken,
             isNewUser,
             isProfileComplete,
+        }
+    }
+
+    /**
+     * Format phone number to E.164 standard (e.g. +91XXXXXXXXXX)
+     */
+    formatPhoneNumber(phone) {
+        if (!phone) return ""
+        const clean = String(phone).trim().replace(/[\s-()]/g, "")
+        if (clean.startsWith("+")) return clean
+        if (/^\d{10}$/.test(clean)) return `+91${clean}`
+        if (/^91\d{10}$/.test(clean)) return `+${clean}`
+        return `+${clean}`
+    }
+
+    /**
+     * Send SMS OTP via Twilio Verify
+     */
+    async sendPhoneOtp({ phone, reqIp = "127.0.0.1" }) {
+        const formattedPhone = this.formatPhoneNumber(phone)
+        if (!formattedPhone || formattedPhone.length < 10) {
+            const error = new Error("Please enter a valid mobile phone number.")
+            error.statusCode = 400
+            throw error
+        }
+
+        const rateLimitKey = `phone-otp-rate:${reqIp}:${formattedPhone}`
+        if (await redisClient.get(rateLimitKey)) {
+            const error = new Error("Please wait 30 seconds before requesting another SMS code.")
+            error.statusCode = 429
+            throw error
+        }
+
+        const activeTwilio = getTwilioClient()
+        if (activeTwilio && config.twilio?.verifyServiceSid) {
+            try {
+                const verification = await activeTwilio.verify.v2
+                    .services(config.twilio.verifyServiceSid)
+                    .verifications.create({ to: formattedPhone, channel: "sms" })
+
+                await redisClient.set(rateLimitKey, "true", { EX: 30 })
+
+                return {
+                    message: `Verification code sent to ${formattedPhone}.`,
+                    phone: formattedPhone,
+                    sid: verification.sid,
+                    status: verification.status,
+                }
+            } catch (err) {
+                console.error("Twilio sendPhoneOtp error:", err.message)
+                const error = new Error(`Failed to send SMS OTP: ${err.message}`)
+                error.statusCode = 400
+                throw error
+            }
+        }
+
+        const simulatedOtp = Math.floor(100000 + Math.random() * 900000).toString()
+        await redisClient.set(`simulated-phone-otp:${formattedPhone}`, simulatedOtp, { EX: 300 })
+        await redisClient.set(rateLimitKey, "true", { EX: 30 })
+
+        return {
+            message: `Verification code generated for ${formattedPhone}.`,
+            phone: formattedPhone,
+            simulated: true,
+        }
+    }
+
+    /**
+     * Verify Phone OTP via Twilio Verify
+     */
+    async verifyPhoneOtp({ phone, otp, userId = null }) {
+        const formattedPhone = this.formatPhoneNumber(phone)
+        const cleanOtp = String(otp || "").trim()
+
+        if (!formattedPhone || !cleanOtp) {
+            const error = new Error("Phone number and verification code are required.")
+            error.statusCode = 400
+            throw error
+        }
+
+        let isApproved = false
+
+        const activeTwilio = getTwilioClient()
+        if (activeTwilio && config.twilio?.verifyServiceSid) {
+            try {
+                const verificationCheck = await activeTwilio.verify.v2
+                    .services(config.twilio.verifyServiceSid)
+                    .verificationChecks.create({ to: formattedPhone, code: cleanOtp })
+
+                isApproved = verificationCheck.status === "approved"
+            } catch (err) {
+                console.error("Twilio verifyPhoneOtp check error:", err.message)
+            }
+        }
+
+        if (!isApproved) {
+            const storedSimOtp = await redisClient.get(`simulated-phone-otp:${formattedPhone}`)
+            if (storedSimOtp && storedSimOtp === cleanOtp) {
+                isApproved = true
+                await redisClient.del(`simulated-phone-otp:${formattedPhone}`)
+            }
+        }
+
+        if (!isApproved) {
+            const error = new Error("Invalid or expired SMS verification code.")
+            error.statusCode = 400
+            throw error
+        }
+
+        let updatedUser = null
+        if (userId) {
+            const existingUser = await User.findOne({ phone: formattedPhone, _id: { $ne: userId } })
+            if (existingUser) {
+                const error = new Error("This phone number is already registered with another account.")
+                error.statusCode = 400
+                throw error
+            }
+
+            updatedUser = await User.findByIdAndUpdate(
+                userId,
+                { phone: formattedPhone, isPhoneVerified: true },
+                { new: true }
+            )
+            if (updatedUser) {
+                await redisClient.setEx(`user:${userId}`, 3600, JSON.stringify(updatedUser.toAuthJSON()))
+            }
+        }
+
+        return {
+            message: "Phone number verified successfully!",
+            phone: formattedPhone,
+            verified: true,
+            user: updatedUser ? updatedUser.toAuthJSON() : undefined,
+        }
+    }
+
+    /**
+     * Update User Phone Number
+     */
+    async updateUserPhone({ userId, phone }) {
+        const formattedPhone = this.formatPhoneNumber(phone)
+        if (!formattedPhone || formattedPhone.length < 10) {
+            const error = new Error("Please provide a valid phone number (at least 10 digits).")
+            error.statusCode = 400
+            throw error
+        }
+
+        const existingUser = await User.findOne({ phone: formattedPhone, _id: { $ne: userId } })
+        if (existingUser) {
+            const error = new Error("This phone number is already associated with another account.")
+            error.statusCode = 400
+            throw error
+        }
+
+        const updatedUser = await User.findByIdAndUpdate(
+            userId,
+            { phone: formattedPhone },
+            { new: true }
+        )
+
+        if (!updatedUser) {
+            const error = new Error("User not found.")
+            error.statusCode = 404
+            throw error
+        }
+
+        await redisClient.setEx(`user:${userId}`, 3600, JSON.stringify(updatedUser.toAuthJSON()))
+
+        return {
+            message: "Phone number updated successfully.",
+            user: updatedUser.toAuthJSON(),
+        }
+    }
+
+    /**
+     * Update User Profile (Name, Gender, Location, Phone)
+     */
+    async updateUserProfile({ userId, name, gender, location, phone }) {
+        const updates = {}
+        if (name?.trim()) updates.name = name.trim()
+        if (gender?.trim()) updates.gender = gender.trim().toLowerCase()
+        if (location?.trim()) updates.location = location.trim()
+        if (phone?.trim()) {
+            const formatted = this.formatPhoneNumber(phone)
+            const existingPhone = await User.findOne({ phone: formatted, _id: { $ne: userId } })
+            if (existingPhone) {
+                const error = new Error("This phone number is already in use by another account.")
+                error.statusCode = 400
+                throw error
+            }
+            updates.phone = formatted
+        }
+
+        const updatedUser = await User.findByIdAndUpdate(userId, updates, { new: true })
+        if (!updatedUser) {
+            const error = new Error("User not found.")
+            error.statusCode = 404
+            throw error
+        }
+
+        const profileUpdates = {}
+        if (updates.name) profileUpdates.name = updates.name
+        if (updates.gender) profileUpdates.gender = updates.gender
+        if (updates.location) profileUpdates["location.city"] = updates.location
+
+        if (Object.keys(profileUpdates).length > 0) {
+            await Profile.findOneAndUpdate({ userId }, { $set: profileUpdates })
+        }
+
+        await redisClient.setEx(`user:${userId}`, 3600, JSON.stringify(updatedUser.toAuthJSON()))
+
+        return {
+            message: "Profile updated successfully.",
+            user: updatedUser.toAuthJSON(),
         }
     }
 

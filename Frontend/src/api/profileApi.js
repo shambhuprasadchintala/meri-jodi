@@ -144,6 +144,7 @@ export const buildProfilePayload = (formData) => {
       drinking: formData.drinking === true || formData.drinking === "true",
     },
     agreedToTerms: formData.acceptTerms || formData.agreedToTerms || undefined,
+    phone: formData.phone?.trim() || undefined,
   }
 
   return payload
@@ -171,6 +172,7 @@ export const updateProfile = async (partialData) => {
 export const buildPersonalDetailsPayload = (formData) => {
   const payload = {}
   if (formData.name?.trim()) payload.name = formData.name.trim()
+  if (formData.phone?.trim()) payload.phone = formData.phone.trim()
   if (formData.day && formData.month && formData.year) {
     const dob = getDateOfBirth(formData)
     if (dob) payload.dateOfBirth = dob

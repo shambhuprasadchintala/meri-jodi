@@ -48,6 +48,7 @@ const initialFormData = {
   partneroccupation: "",
   partnerincome: "",
   city: "",
+  phone: "",
   hobbies: [],
   additionalPreference: "",
 }
@@ -343,6 +344,13 @@ const AddDetailsManually = () => {
         extractedData.partnerincome ||
         savedData.partnerincome ||
         "",
+      phone:
+        extractedData.phone ||
+        extractedData.contact_details?.mobile ||
+        extractedData.contact_details?.phone ||
+        savedData.phone ||
+        (user?.phone ? user.phone.replace(/^\+91/, "").replace(/\D/g, "") : "") ||
+        "",
       additionalPreference:
         extractedData.additionalPreference ||
         savedData.additionalPreference ||
@@ -434,6 +442,11 @@ const AddDetailsManually = () => {
             gotham: prev.gotham || existing.gotham || "",
             rashi: prev.rashi || existing.rashi || "",
             nakshtra: prev.nakshtra || existing.nakshtra || "",
+            phone:
+              prev.phone ||
+              (existing.userId?.phone ? String(existing.userId.phone).replace(/^\+91/, "").replace(/\D/g, "") : "") ||
+              (user?.phone ? String(user.phone).replace(/^\+91/, "").replace(/\D/g, "") : "") ||
+              "",
             hobbies:
               Array.isArray(prev.hobbies) && prev.hobbies.length > 0
                 ? prev.hobbies
@@ -488,8 +501,14 @@ const AddDetailsManually = () => {
       await createProfile(payload)
 
       // Instantly update user in AuthContext and refresh session
-      if (formData.name && updateUser) {
-        updateUser({ name: formData.name.trim() })
+      const userUpdates = {}
+      if (formData.name) userUpdates.name = formData.name.trim()
+      if (formData.phone) {
+        const clean = formData.phone.replace(/\D/g, "")
+        userUpdates.phone = clean.length === 10 ? `+91${clean}` : formData.phone
+      }
+      if (Object.keys(userUpdates).length && updateUser) {
+        updateUser(userUpdates)
       }
       if (refreshUser) {
         await refreshUser()

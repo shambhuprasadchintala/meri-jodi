@@ -80,6 +80,13 @@ export default function BasicInfo({
 
     if (!formData.gender) err.gender = "Select gender";
 
+    const cleanPhone = (formData.phone || "").trim().replace(/\D/g, "");
+    if (!cleanPhone) {
+      err.phone = "Mobile number is required";
+    } else if (cleanPhone.length !== 10) {
+      err.phone = "Please enter a valid 10-digit mobile number";
+    }
+
     setErrors(err);
     return Object.keys(err).length === 0;
   };
@@ -111,6 +118,35 @@ export default function BasicInfo({
         />
         {errors.name && (
           <p className="text-red-500 mt-1 text-xs">{errors.name}</p>
+        )}
+      </div>
+
+      {/* Mobile Number */}
+      <div className="mb-6">
+        <label className="font-medium mb-2 block text-gray-700 text-sm">
+          Mobile Number <span className="text-red-500">*</span>
+        </label>
+        <div className="relative">
+          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-500">
+            +91
+          </span>
+          <input
+            type="tel"
+            maxLength={10}
+            value={formData.phone || ""}
+            onChange={(e) => updateField("phone", e.target.value.replace(/\D/g, ""))}
+            placeholder="9876543210"
+            className={`w-full py-[10px] pl-12 pr-3 rounded-[10px] border-2 outline-none transition-colors text-sm ${
+              errors.phone ? "border-red-500" : "border-[#DFDFDF] hover:border-[#842029] focus:border-[#842029]"
+            }`}
+          />
+        </div>
+        {errors.phone ? (
+          <p className="text-red-500 mt-1 text-xs">{errors.phone}</p>
+        ) : (
+          <p className="text-gray-400 text-[11px] mt-1">
+            Required for match notifications, SMS alerts, and verified badge.
+          </p>
         )}
       </div>
 

@@ -73,6 +73,7 @@ const EditProfileModal = ({ isOpen, section: initialSection = "personal", profil
       setFormData({
         // Personal
         name: profile.name || profile.userId?.name || "",
+        phone: profile.userId?.phone || profile.phone || "",
         day: profile.dateOfBirth ? new Date(profile.dateOfBirth).getDate().toString() : "",
         month: profile.dateOfBirth ? MONTHS[new Date(profile.dateOfBirth).getMonth()] : "",
         year: profile.dateOfBirth ? new Date(profile.dateOfBirth).getFullYear().toString() : "",
@@ -285,16 +286,29 @@ const EditProfileModal = ({ isOpen, section: initialSection = "personal", profil
           {/* 1. PERSONAL */}
           {activeSection === "personal" && (
             <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1.5">Full Name</label>
-                <input
-                  type="text"
-                  name="name"
-                  placeholder="Your full name"
-                  value={formData.name || ""}
-                  onChange={handleChange}
-                  className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm focus:outline-none focus:border-[#842029]"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1.5">Full Name</label>
+                  <input
+                    type="text"
+                    name="name"
+                    placeholder="Your full name"
+                    value={formData.name || ""}
+                    onChange={handleChange}
+                    className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm focus:outline-none focus:border-[#842029]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1.5">Mobile Number</label>
+                  <input
+                    type="tel"
+                    name="phone"
+                    placeholder="e.g. +919876543210"
+                    value={formData.phone || ""}
+                    onChange={handleChange}
+                    className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm focus:outline-none focus:border-[#842029]"
+                  />
+                </div>
               </div>
 
               <div>

@@ -331,23 +331,101 @@ router.put("/change-password", authenticate, sanitizeBody, async (req, res) => {
     }
 })
 
-/*
- * ==============================================================================
- * TWILIO SMS OTP ROUTES - COMMENTED FOR REFERENCE AS REQUESTED
- * ==============================================================================
- * 
- * router.post("/send-otp", async (req, res) => {
- *     const apiResponse = new ApiResponse(res)
- *     try {
- *         const { phone } = req.body
- *         if (!phone) return apiResponse.error("Phone number is required", 400)
- *         const result = await authService.sendOtp(phone)
- *         return apiResponse.success({ sid: result.sid }, "OTP sent successfully")
- *     } catch (error) {
- *         return apiResponse.error(error.message, 400)
- *     }
- * })
- * ==============================================================================
+/**
+ * PUT /api/auth/me
+ * PUT /api/auth/profile
+ * Update profile details (name, gender, location, phone) for authenticated user.
  */
+const handleUpdateProfile = async (req, res) => {
+    const apiResponse = new ApiResponse(res)
+    try {
+        const { name, gender, location, phone } = req.body
+        const result = await authService.updateUserProfile({
+            userId: req.userId,
+            name,
+            gender,
+            location,
+            phone,
+        })
+        return apiResponse.success(result, result.message, 200)
+    } catch (error) {
+        return apiResponse.error(error.message, error.statusCode || 400)
+    }
+}
+
+router.put("/me", authenticate, sanitizeBody, handleUpdateProfile)
+router.put("/profile", authenticate, sanitizeBody, handleUpdateProfile)
+
+/**
+ * PUT /api/auth/phone
+ * Update phone number for authenticated user.
+ */
+router.put("/phone", authenticate, sanitizeBody, async (req, res) => {
+    const apiResponse = new ApiResponse(res)
+    try {
+        const { phone } = req.body
+        if (!phone) return apiResponse.error("Phone number is required", 400)
+
+        const result = await authService.updateUserPhone({
+            userId: req.userId,
+            phone,
+        })
+        return apiResponse.success(result, result.message, 200)
+    } catch (error) {
+        return apiResponse.error(error.message, error.statusCode || 400)
+    }
+})
+
+/**
+ * POST /api/auth/send-phone-otp
+ * POST /api/auth/phone/send-otp
+ * Send SMS OTP via Twilio Verify.
+ */
+const handleSendPhoneOtp = async (req, res) => {
+    const apiResponse = new ApiResponse(res)
+    try {
+        const phone = req.body?.phone || req.body?.mobile
+        if (!phone) return apiResponse.error("Phone number is required", 400)
+
+        const reqIp = req.ip || req.connection?.remoteAddress || "127.0.0.1"
+        const result = await authService.sendPhoneOtp({ phone, reqIp })
+        return apiResponse.success(result, result.message, 200)
+    } catch (error) {
+        return apiResponse.error(error.message, error.statusCode || 400)
+    }
+}
+
+router.post("/send-phone-otp", sanitizeBody, handleSendPhoneOtp)
+router.post("/phone/send-otp", sanitizeBody, handleSendPhoneOtp)
+router.post("/send-otp", sanitizeBody, handleSendPhoneOtp)
+
+/**
+ * POST /api/auth/verify-phone-otp
+ * POST /api/auth/phone/verify-otp
+ * Verify SMS OTP via Twilio Verify and update phone verification status.
+ */
+const handleVerifyPhoneOtp = async (req, res) => {
+    const apiResponse = new ApiResponse(res)
+    try {
+        const phone = req.body?.phone || req.body?.mobile
+        const otp = req.body?.otp || req.body?.code
+        if (!phone || !otp) {
+            return apiResponse.error("Phone number and verification code are required", 400)
+        }
+
+        const result = await authService.verifyPhoneOtp({
+            phone,
+            otp,
+            userId: req.userId || null,
+        })
+        return apiResponse.success(result, result.message, 200)
+    } catch (error) {
+        return apiResponse.error(error.message, error.statusCode || 400)
+    }
+}
+
+router.post("/verify-phone-otp", attachUser, sanitizeBody, handleVerifyPhoneOtp)
+router.post("/phone/verify-otp", attachUser, sanitizeBody, handleVerifyPhoneOtp)
+router.post("/verify-phone", attachUser, sanitizeBody, handleVerifyPhoneOtp)
 
 export default router

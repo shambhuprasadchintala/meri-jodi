@@ -177,3 +177,35 @@ export const changePassword = async (currentPassword, newPassword) => {
     const res = await authApi.put("/change-password", { currentPassword, newPassword })
     return unwrap(res)
 }
+
+/**
+ * Send SMS OTP via Twilio
+ */
+export const sendPhoneOtp = async (phone) => {
+    const res = await authApi.post("/phone/send-otp", { phone })
+    return unwrap(res)
+}
+
+/**
+ * Verify SMS OTP via Twilio
+ */
+export const verifyPhoneOtp = async (phone, otp) => {
+    const res = await authApi.post("/phone/verify-otp", { phone, otp })
+    return unwrap(res)
+}
+
+/**
+ * Update authenticated user's phone number
+ */
+export const updateUserPhone = async (phone) => {
+    const res = await authApi.put("/phone", { phone })
+    return unwrap(res)
+}
+
+/**
+ * Update authenticated user profile fields (name, gender, location, phone)
+ */
+export const updateUserProfile = async ({ name, gender, location, phone }) => {
+    const res = await authApi.put("/me", { name, gender, location, phone })
+    return unwrap(res)
+}
