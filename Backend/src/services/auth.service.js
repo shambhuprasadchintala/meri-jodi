@@ -7,6 +7,7 @@ import { Profile } from "../models/Profile.js"
 import { ROLES, USER_STATUS } from "../constants/index.js"
 import { redisClient } from "../config/redis.js"
 import sendMail from "../config/sendMail.js"
+import { verifyGoogleIdentity } from "../utils/googleIdentity.js"
 import { getOtpHtml, getVerifyEmailHtml, getResetPasswordHtml } from "../config/html.js"
 import {
     generateToken,
@@ -91,7 +92,10 @@ import {
  * ==============================================================================
  */
 
-const googleOAuthClient = new OAuth2Client(config.google.clientId || undefined)
+const googleOAuthClient = new OAuth2Client({
+    clientId: config.google.clientId || undefined,
+    transporterOptions: { timeout: 8000, retry: false },
+})
 
 class AuthService {
     /**
@@ -183,9 +187,9 @@ class AuthService {
         })
         const mailResult = await sendMail({ email: cleanEmail, subject, html, text })
         if (mailResult && mailResult.error) {
-            console.warn(`[Registration Email Warning] SMTP delivery failed for ${cleanEmail}: ${mailResult.error}`)
+            console.warn(`[Registration Email Warning] Email delivery failed for ${cleanEmail}: ${mailResult.error}`)
             if (config.env === "production") {
-                const err = new Error(`Failed to send verification email to ${cleanEmail}: ${mailResult.error}. Please check your SMTP configuration.`)
+                const err = new Error(`Failed to send verification email to ${cleanEmail}: ${mailResult.error}. Please try again later.`)
                 err.statusCode = 500
                 throw err
             }
@@ -457,9 +461,9 @@ class AuthService {
         const html = getOtpHtml({ email: cleanEmail, otp, appName: config.appName })
         const mailResult = await sendMail({ email: cleanEmail, subject, html, text })
         if (mailResult?.error) {
-            console.warn(`[Login Email Warning] SMTP delivery failed for ${cleanEmail}: ${mailResult.error}`)
+            console.warn(`[Login Email Warning] Email delivery failed for ${cleanEmail}: ${mailResult.error}`)
             if (config.env === "production") {
-                const err = new Error(`Failed to deliver verification code to your email (${mailResult.error}). Please check your SMTP settings.`)
+                const err = new Error(`Failed to deliver verification code to your email (${mailResult.error}). Please try again later.`)
                 err.statusCode = 500
                 throw err
             }
@@ -599,9 +603,9 @@ class AuthService {
         const html = getOtpHtml({ email: cleanEmail, otp, appName: config.appName })
         const mailResult = await sendMail({ email: cleanEmail, subject, html, text })
         if (mailResult?.error) {
-            console.warn(`[Resend Email Warning] SMTP delivery failed for ${cleanEmail}: ${mailResult.error}`)
+            console.warn(`[Resend Email Warning] Email delivery failed for ${cleanEmail}: ${mailResult.error}`)
             if (config.env === "production") {
-                const err = new Error(`Failed to deliver new code to ${cleanEmail} (${mailResult.error}). Please check your SMTP settings.`)
+                const err = new Error(`Failed to deliver new code to ${cleanEmail} (${mailResult.error}). Please try again later.`)
                 err.statusCode = 500
                 throw err
             }
@@ -620,81 +624,16 @@ class AuthService {
      * Supports both JWT ID tokens (from authorization code flow) and
      * access_tokens (from useGoogleLogin implicit flow).
      */
-    async googleAuth({ idToken, credential, accessToken: incomingAccessToken, email, name, googleId, avatar, res = null }) {
-        let verifiedGoogleId = googleId
-        let verifiedEmail = email
-        let verifiedName = name
-        let verifiedAvatar = avatar
-
-        const tokenToVerify = idToken || credential
-
-        // Path 1: Try cryptographic JWT ID token verification
-        if (tokenToVerify) {
-            try {
-                const ticket = await googleOAuthClient.verifyIdToken({
-                    idToken: tokenToVerify,
-                    audience: config.google.clientId || undefined,
-                })
-                const payload = ticket.getPayload()
-                if (payload) {
-                    verifiedGoogleId = payload.sub
-                    verifiedEmail = payload.email
-                    verifiedName = payload.name || verifiedName
-                    verifiedAvatar = payload.picture || verifiedAvatar
-                }
-            } catch (err) {
-                console.warn("Google verifyIdToken failed, trying as access_token:", err.message)
-
-                // Path 2: Token might be an access_token from implicit flow.
-                // Call Google userinfo API to get verified user data.
-                try {
-                    const userinfoRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
-                        headers: { Authorization: `Bearer ${tokenToVerify}` },
-                    })
-
-                    if (userinfoRes.ok) {
-                        const userinfo = await userinfoRes.json()
-                        if (userinfo.sub) {
-                            verifiedGoogleId = userinfo.sub
-                            verifiedEmail = userinfo.email || verifiedEmail
-                            verifiedName = userinfo.name || verifiedName
-                            verifiedAvatar = userinfo.picture || verifiedAvatar
-                        }
-                    } else {
-                        console.warn("Google userinfo API returned:", userinfoRes.status)
-                    }
-                } catch (userinfoErr) {
-                    console.warn("Google userinfo fetch failed:", userinfoErr.message)
-                }
-            }
-        }
-
-        // Path 3: If a separate accessToken field was provided (frontend sends it explicitly)
-        if (!verifiedGoogleId && !verifiedEmail && incomingAccessToken) {
-            try {
-                const userinfoRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
-                    headers: { Authorization: `Bearer ${incomingAccessToken}` },
-                })
-
-                if (userinfoRes.ok) {
-                    const userinfo = await userinfoRes.json()
-                    if (userinfo.sub) {
-                        verifiedGoogleId = userinfo.sub
-                        verifiedEmail = userinfo.email || verifiedEmail
-                        verifiedName = userinfo.name || verifiedName
-                        verifiedAvatar = userinfo.picture || verifiedAvatar
-                    }
-                }
-            } catch (userinfoErr) {
-                console.warn("Google userinfo (accessToken field) fetch failed:", userinfoErr.message)
-            }
-        }
-
-        if (!verifiedEmail && !verifiedGoogleId) {
-            const error = new Error("Invalid Google authentication payload.")
-            error.statusCode = 400
-            throw error
-        }
+    async googleAuth({ idToken, credential, accessToken: incomingAccessToken, res = null }) {
+        const {
+            googleId: verifiedGoogleId,
+            email: verifiedEmail,
+            name: verifiedName,
+            avatar: verifiedAvatar,
+        } = await verifyGoogleIdentity(
+            { idToken, credential, accessToken: incomingAccessToken },
+            { clientId: config.google.clientId, client: googleOAuthClient },
+        )
 
         let user = null
         let isNewUser = false
@@ -706,6 +645,16 @@ class AuthService {
         }
 
         if (user) {
+            if (user.status !== USER_STATUS.ACTIVE) {
+                const error = new Error("Your account is inactive or suspended.")
+                error.statusCode = 403
+                throw error
+            }
+            if (user.googleId && user.googleId !== verifiedGoogleId) {
+                const error = new Error("This email is linked to a different Google account.")
+                error.statusCode = 401
+                throw error
+            }
             if (verifiedGoogleId && !user.googleId) user.googleId = verifiedGoogleId
             if (verifiedAvatar && !user.avatar) user.avatar = verifiedAvatar
             if (verifiedName && (!user.name || user.name === "Google Member" || user.name === "MeriJodi Member" || user.name === "New Member")) {
@@ -882,7 +831,7 @@ class AuthService {
         })
         const mailResult = await sendMail({ email: cleanEmail, subject, html, text })
         if (mailResult?.error) {
-            console.warn(`[Forgot Password Email Warning] SMTP delivery failed for ${cleanEmail}: ${mailResult.error}`)
+            console.warn(`[Forgot Password Email Warning] Email delivery failed for ${cleanEmail}: ${mailResult.error}`)
             if (config.env === "production") {
                 const err = new Error(`Failed to send password reset email (${mailResult.error}).`)
                 err.statusCode = 500

@@ -32,6 +32,12 @@ const _config = {
     refreshSecret: process.env.REFRESH_SECRET || process.env.JWT_SECRET + "_refresh",
     redisUrl: process.env.REDIS_URL || "redis://127.0.0.1:6379",
 
+    mail: {
+        provider: process.env.MAIL_PROVIDER || "smtp",
+        brevoApiKey: process.env.BREVO_API_KEY || "",
+        fromEmail: process.env.MAIL_FROM_EMAIL || process.env.SMTP_USER || "",
+    },
+
     smtp: {
         user: process.env.SMTP_USER || "",
         pass: process.env.SMTP_PASSWORD || "",
