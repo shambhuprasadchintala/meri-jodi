@@ -47,7 +47,7 @@ function App() {
           <Route
             path="/complete-profile"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute requireApproved={false}>
                 <CompleteProfilePage />
               </ProtectedRoute>
             }
@@ -55,7 +55,7 @@ function App() {
           <Route
             path="/add-details"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute requireApproved={false}>
                 <AddDetailsManually />
               </ProtectedRoute>
             }
@@ -63,7 +63,7 @@ function App() {
           <Route
             path="/upload-biodata"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute requireApproved={false}>
                 <UploadBiodataPage />
               </ProtectedRoute>
             }
@@ -119,7 +119,7 @@ function App() {
           <Route
             path="/profile"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute requireApproved={false}>
                 <MyProfile />
               </ProtectedRoute>
             }

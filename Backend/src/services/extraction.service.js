@@ -1,63 +1,36 @@
-import { GoogleGenAI, Type } from "@google/genai"
-
-let aiClient = null
-const getAI = () => {
-    if (!aiClient && process.env.GEMINI_API_KEY) {
-        try {
-            aiClient = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
-        } catch (e) {
-            console.warn("Failed to initialize GoogleGenAI client:", e.message)
-        }
-    }
-    return aiClient
-}
-
-const GEMINI_MODELS = [
-    "gemini-2.5-flash",
-    "gemini-2.0-flash",
-    "gemini-1.5-flash",
-    "gemini-1.5-pro",
-    "gemini-2.5-pro",
-]
-
-const GROQ_MODELS = [
-    "openai/gpt-oss-120b",
-    "openai/gpt-oss-20b",
-    "qwen/qwen3.8-27b",
-    "llama-3.3-70b-versatile",
-]
-
-async function generateWithGroq(messages, jsonMode = false, temperature = 0.3) {
-    if (!process.env.GROQ_API_KEY) return null
-    for (const model of GROQ_MODELS) {
-        try {
-            const body = {
-                model,
-                messages,
-                temperature,
-            }
-            if (jsonMode) {
-                body.response_format = { type: "json_object" }
-            }
-            const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-                },
-                body: JSON.stringify(body),
-            })
-            if (res.ok) {
-                const data = await res.json()
-                const content = data.choices?.[0]?.message?.content?.trim()
-                if (content) return { model, content }
-            }
-        } catch (err) {
-            console.warn(`[Groq] Model ${model} failed, trying next:`, err.message || err)
-        }
-    }
-    return null
-}
+// [COMMENTED OUT: AI FEATURES & DOCUMENT EXTRACTION - MANUAL PROFILE ENTRY REQUIRED]
+// import { GoogleGenAI, Type } from "@google/genai"
+//
+// let aiClient = null
+// const getAI = () => {
+//     if (!aiClient && process.env.GEMINI_API_KEY) {
+//         try {
+//             aiClient = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
+//         } catch (e) {
+//             console.warn("Failed to initialize GoogleGenAI client:", e.message)
+//         }
+//     }
+//     return aiClient
+// }
+//
+// const GEMINI_MODELS = [
+//     "gemini-2.5-flash",
+//     "gemini-2.0-flash",
+//     "gemini-1.5-flash",
+//     "gemini-1.5-pro",
+//     "gemini-2.5-pro",
+// ]
+//
+// const GROQ_MODELS = [
+//     "openai/gpt-oss-120b",
+//     "openai/gpt-oss-20b",
+//     "qwen/qwen3.8-27b",
+//     "llama-3.3-70b-versatile",
+// ]
+//
+// async function generateWithGroq(messages, jsonMode = false, temperature = 0.3) {
+//     return null
+// }
 
 async function generateWithGemini(contents, config = {}) {
     const ai = getAI()
@@ -656,310 +629,44 @@ const createDefaultBiodataStructure = () => {
 
 class ExtractionService {
     /**
-     * Extract structured biodata from an uploaded PDF or image buffer.
-     * Uses a resilient multi-tier pipeline:
-     * Tier 1: pdf-parse text extraction (for PDF files)
-     * Tier 2: Gemini multimodal & GenAI processing (if configured)
-     * Tier 3: Groq LLM (llama-3.3-70b-versatile) JSON extraction (if configured)
-     * Tier 4: Matrimonial heuristic regex parser (100% reliable offline fallback)
-     * @param {Buffer} fileBuffer
-     * @param {string} mimeType
-     * @returns {Promise<object>} Standardized extracted biodata JSON
+     * [COMMENTED OUT: AI & DOCUMENT EXTRACTION IS DISABLED]
+     * All users must manually fill in their profile details.
      */
     async extractBiodata(fileBuffer, mimeType = "application/pdf") {
-        if (!fileBuffer || fileBuffer.length === 0) {
-            throw new Error("No file content received for extraction.")
-        }
-
-        let pdfText = ""
-        const isPdf = mimeType === "application/pdf" || (!mimeType && fileBuffer.slice(0, 5).toString().includes("%PDF"))
-
-        // Tier 1: Extract raw text if PDF
-        if (isPdf) {
-            try {
-                const pdfMod = await import("pdf-parse")
-                const PDFParse = pdfMod.PDFParse || pdfMod.default
-                if (typeof PDFParse === "function" && PDFParse.prototype?.getText) {
-                    const parser = new PDFParse({ data: fileBuffer })
-                    const res = await parser.getText()
-                    pdfText = (typeof res === "string" ? res : res?.text || "").trim()
-                } else if (typeof pdfMod.default === "function") {
-                    const res = await pdfMod.default(fileBuffer)
-                    pdfText = (res?.text || "").trim()
-                }
-            } catch (pdfErr) {
-                console.warn("[PDF Parse Warning] Could not parse text with pdf-parse:", pdfErr.message)
-            }
-        }
-
-        const extractionPrompt = `You are an expert matrimonial biodata parser. Extract all details from the provided biodata document or text into strict JSON matching this exact structure:
-{
-  "personal_details": {
-    "name": "Full Name",
-    "gender": "male or female",
-    "date_of_birth": "YYYY-MM-DD or date string",
-    "place_of_birth": "City, State",
-    "time_of_birth": "e.g. 10:30 AM",
-    "rashi": "e.g. Mesha, Vrishabha",
-    "nakshatra": "e.g. Rohini, Ashwini",
-    "height": "e.g. 5'8\\\" or 172 cm",
-    "marital_status": "never_married, divorced, or widowed",
-    "manglik": "yes, no, or anshik",
-    "complexion": "Fair, Wheatish, etc.",
-    "highest_education": "Degree name",
-    "organization_name": "Company or job title",
-    "annual_income": "e.g. 12 LPA",
-    "about_me": "Brief self introduction",
-    "mother_tongue": "e.g. Hindi, Marathi, Gujarati, Telugu",
-    "religion": "e.g. Hindu, Muslim, Sikh, Jain",
-    "caste": "Caste name",
-    "gotra": "Gotra name",
-    "hobbies": ["hobby1", "hobby2"]
-  },
-  "family_details": {
-    "fathers_name": "Father's Full Name",
-    "fathers_occupation": "Father's occupation",
-    "mothers_name": "Mother's Full Name",
-    "mothers_occupation": "Mother's occupation"
-  },
-  "contact_details": {
-    "contact_number": "Phone number",
-    "email_id": "Email address",
-    "city": "Current city/location"
-  }
-}
-
-Return ONLY valid JSON. No conversational text or markdown codeblocks outside JSON.`
-
-        // Tier 2: Try Gemini if key is available
-        if (process.env.GEMINI_API_KEY) {
-            try {
-                const ai = getAI()
-                if (ai) {
-                    let contents
-                    if (isPdf && pdfText) {
-                        contents = [extractionPrompt, `Biodata Text Content:\n${pdfText}`]
-                    } else {
-                        contents = [
-                            {
-                                inlineData: {
-                                    data: fileBuffer.toString("base64"),
-                                    mimeType: mimeType || "application/pdf",
-                                },
-                            },
-                            extractionPrompt,
-                        ]
-                    }
-
-                    const text = await generateWithGemini(contents, {
-                        responseMimeType: "application/json",
-                        responseSchema: biodataSchema,
-                    })
-
-                    if (text) {
-                        const parsed = JSON.parse(text)
-                        return normalizeBiodataResult(parsed)
-                    }
-                }
-            } catch (geminiErr) {
-                console.warn("[Gemini Extraction Warning] Gemini failed, attempting Groq fallback:", geminiErr.message)
-            }
-        }
-
-        // Tier 3: Try Groq LLM (120B/20B/Qwen models) with extracted text or text representation
-        if (process.env.GROQ_API_KEY && (pdfText || !isPdf)) {
-            try {
-                const textToProcess = pdfText || fileBuffer.toString("utf-8", 0, Math.min(fileBuffer.length, 10000))
-                if (textToProcess && textToProcess.length > 10) {
-                    const groqRes = await generateWithGroq([
-                        {
-                            role: "system",
-                            content: "You are an expert AI parser for Indian matrimonial biodatas. Return strictly valid JSON matching the user schema.",
-                        },
-                        {
-                            role: "user",
-                            content: `${extractionPrompt}\n\nBiodata Content:\n${textToProcess}`,
-                        },
-                    ], true, 0.1)
-
-                    if (groqRes && groqRes.content) {
-                        let rawJson = groqRes.content.trim()
-                        if (rawJson.startsWith("```json")) {
-                            rawJson = rawJson.replace(/^```json\s*/, "").replace(/\s*```$/, "")
-                        } else if (rawJson.startsWith("```")) {
-                            rawJson = rawJson.replace(/^```\s*/, "").replace(/\s*```$/, "")
-                        }
-                        const parsed = JSON.parse(rawJson)
-                        return normalizeBiodataResult(parsed)
-                    }
-                }
-            } catch (groqErr) {
-                console.warn("[Groq Extraction Warning] Groq failed, switching to heuristic rule parser:", groqErr.message)
-            }
-        }
-
-        // Tier 4: 100% Reliable Heuristic / Regex Extraction
-        if (pdfText) {
-            return extractBiodataFromTextHeuristic(pdfText)
-        }
-
-        // Final fallback: Return formatted default structure with whatever string could be retrieved
-        const rawString = fileBuffer.toString("utf-8", 0, Math.min(fileBuffer.length, 5000))
-        return extractBiodataFromTextHeuristic(rawString)
+        // [COMMENTED OUT: AI BIODATA EXTRACTION & PARSER]
+        // Document extraction is disabled as per project specifications.
+        // Users must manually fill in their matrimonial details.
+        throw new Error("AI document extraction is disabled. Please enter your profile details manually.")
     }
 
     /**
      * Extract structured biodata directly from raw text
-     * @param {string} text
-     * @returns {object} Standardized extracted biodata JSON
      */
     extractFromText(text = "") {
-        return extractBiodataFromTextHeuristic(text)
+        throw new Error("AI document extraction is disabled. Please enter your profile details manually.")
     }
 
     /**
-     * Generate an engaging matrimonial profile bio using Gemini AI (with Groq LLM fallback)
+     * [COMMENTED OUT: AI BIO GENERATION]
      */
     async generateBio(details = {}) {
-        const {
-            name = "User",
-            gender = "",
-            occupation = "",
-            education = "",
-            city = "",
-            location = "",
-            hobbies = [],
-            religion = "",
-            maritalStatus = "",
-        } = details
-
-        const userCity = city || location || "India"
-        const hobbiesStr = Array.isArray(hobbies) && hobbies.length > 0
-            ? hobbies.join(", ")
-            : "reading, traveling, fitness, and family time"
-
-        const bioPrompt = `Write a warm, dignified, and attractive first-person matrimonial profile introduction (50 to 200 words) for an Indian matchmaking platform.
-Profile Details:
-- Name: ${name}
-- Gender: ${gender || "Not specified"}
-- Profession: ${occupation || "Professional"}
-- Education: ${education || "Graduate"}
-- Location: ${userCity}
-- Hobbies / Interests: ${hobbiesStr}
-${religion ? `- Religion / Values: ${religion}` : ""}
-${maritalStatus ? `- Marital Status: ${maritalStatus}` : ""}
-
-Instructions:
-1. Write in natural, polite first-person ("I am...", "I value...").
-2. Mention personality, professional background, lifestyle interests, and what kind of life partner is desired.
-3. Keep it between 50 and 200 words.
-4. Return ONLY the plain text bio without quotes or markdown headers.`
-
-        // Tier 1: Try Gemini
-        if (process.env.GEMINI_API_KEY) {
-            try {
-                const response = await generateWithGemini([bioPrompt])
-                if (response && response.length >= 40) {
-                    return response.replace(/^["']|["']$/g, "").trim()
-                }
-            } catch (err) {
-                console.warn("[Gemini Bio Generation Warning] Gemini failed, trying Groq:", err.message)
-            }
-        }
-
-        // Tier 2: Try Groq (120B / 20B / Qwen LLMs)
-        if (process.env.GROQ_API_KEY) {
-            try {
-                const groqRes = await generateWithGroq([
-                    { role: "system", content: "You are an expert matrimonial profile writer." },
-                    { role: "user", content: bioPrompt },
-                ], false, 0.7)
-                if (groqRes && groqRes.content && groqRes.content.length >= 40) {
-                    return groqRes.content.replace(/^["']|["']$/g, "").trim()
-                }
-            } catch (groqErr) {
-                console.warn("[Groq Bio Generation Warning] Groq failed, using template:", groqErr.message)
-            }
-        }
-
-        // Tier 3: High-quality dynamic template fallback
-        return `Hello! I am ${name}, a ${occupation || "working professional"} based in ${userCity}${education ? ` with a background in ${education}` : ""}. I consider myself an open-minded, grounded individual with a modern outlook and respect for traditional family values. In my free time, I enjoy ${hobbiesStr}. I am looking for a kind-hearted, progressive, and understanding life partner who values mutual respect, companionship, and growing together through all stages of life.`
+        // AI Bio generation disabled - return standard default profile text
+        const { name = "Member", occupation = "working professional", city = "India" } = details
+        return `Hello! I am ${name}, a ${occupation} based in ${city}. I consider myself a grounded individual with a modern outlook and respect for traditional family values. I look forward to connecting with a compatible life partner.`
     }
 
     /**
-     * Generate AI-powered conversation starters and icebreakers using Gemini & Groq
+     * [COMMENTED OUT: AI CHAT SUGGESTIONS]
      */
     async generateChatSuggestions(partnerDetails = {}, lastMessage = "", category = "icebreaker") {
-        const { name = "there", occupation = "", city = "", hobbies = [] } = partnerDetails
-        const firstName = name.split(" ")[0] || "there"
-
-        const prompt = `Generate 4 friendly, polite, and engaging conversation starters/icebreakers for a matrimonial chat on an Indian matchmaking platform.
-Recipient Name: ${firstName}
-Recipient Occupation: ${occupation || "Not specified"}
-Recipient City: ${city || "Not specified"}
-Recipient Hobbies: ${Array.isArray(hobbies) ? hobbies.join(", ") : "Not specified"}
-Last Message Context: ${lastMessage || "Starting a fresh conversation"}
-
-Return strictly a JSON object with a "suggestions" array containing 4 strings (e.g. {"suggestions": ["Suggestion 1", "Suggestion 2", "Suggestion 3", "Suggestion 4"]}).`
-
-        // Tier 1: Try Gemini
-        if (process.env.GEMINI_API_KEY) {
-            try {
-                const response = await generateWithGemini([prompt], {
-                    responseMimeType: "application/json",
-                })
-                if (response) {
-                    const parsed = JSON.parse(response)
-                    if (Array.isArray(parsed) && parsed.length > 0) return parsed.slice(0, 4)
-                    if (Array.isArray(parsed.suggestions) && parsed.suggestions.length > 0) return parsed.suggestions.slice(0, 4)
-                }
-            } catch (err) {
-                console.warn("[Gemini Chat Suggestions Warning] Gemini failed, trying Groq:", err.message)
-            }
-        }
-
-        // Tier 2: Try Groq (120B / 20B / Qwen LLMs)
-        if (process.env.GROQ_API_KEY) {
-            try {
-                const groqRes = await generateWithGroq([
-                    { role: "system", content: "You are an expert matchmaking conversation coach. Return a JSON object with a 'suggestions' array containing 4 starter questions." },
-                    { role: "user", content: prompt },
-                ], true, 0.7)
-                if (groqRes && groqRes.content) {
-                    let raw = groqRes.content.trim()
-                    if (raw.startsWith("```json")) raw = raw.replace(/^```json\s*/, "").replace(/\s*```$/, "")
-                    else if (raw.startsWith("```")) raw = raw.replace(/^```\s*/, "").replace(/\s*```$/, "")
-                    const parsed = JSON.parse(raw)
-                    const list = Array.isArray(parsed) ? parsed : (parsed.suggestions || parsed.starters || Object.values(parsed))
-                    if (Array.isArray(list) && list.length > 0) return list.slice(0, 4)
-                }
-            } catch (groqErr) {
-                console.warn("[Groq Chat Suggestions Warning] Groq failed, using heuristics:", groqErr.message)
-            }
-        }
-
-        // Tier 3: Dynamic rule-based starters
-        const suggestions = []
-        if (lastMessage) {
-            suggestions.push(`Thanks for your message, ${firstName}! That sounds really interesting. How has the rest of your week been?`)
-            suggestions.push(`I appreciate you sharing that, ${firstName}. I would love to learn more about your thoughts on this!`)
-            suggestions.push(`Hello ${firstName}! That's wonderful. What do you enjoy most in your day-to-day routine?`)
-            suggestions.push(`Thank you for reaching out, ${firstName}. Shall we talk a bit about our family backgrounds and interests?`)
-        } else {
-            if (occupation) suggestions.push(`Hi ${firstName}! I saw your profile and was really impressed by your work in ${occupation}. How is your week going?`)
-            else suggestions.push(`Hi ${firstName}! I came across your profile and would love to connect and get to know you better.`)
-
-            if (hobbies.length > 0) suggestions.push(`Hello ${firstName}! I noticed you enjoy ${hobbies[0]}—I find that exciting. What got you into it?`)
-            else if (city) suggestions.push(`Hello ${firstName}! It's great to connect with someone from ${city}. How are things in your city?`)
-            else suggestions.push(`Hello ${firstName}! I really liked your profile and thought we might share similar values and interests.`)
-
-            if (city) suggestions.push(`Hi ${firstName}! How do you usually like to spend your free time in ${city}?`)
-            else suggestions.push(`Hi ${firstName}! What are some hobbies or passions that you are currently enthusiastic about?`)
-
-            suggestions.push(`Namaste ${firstName}! I'd love to know more about your lifestyle preferences and what you look for in a life partner.`)
-        }
-
-        return suggestions.slice(0, 4)
+        // Return friendly static starter questions
+        const firstName = partnerDetails.name ? partnerDetails.name.split(" ")[0] : "there"
+        return [
+            `Hi ${firstName}! I came across your profile and would love to connect.`,
+            `Hello ${firstName}! How is your day going?`,
+            `Namaste ${firstName}! I'd love to know more about your hobbies and interests.`,
+            `Hi ${firstName}! I liked your profile and thought we might share similar values.`,
+        ]
     }
 }
 

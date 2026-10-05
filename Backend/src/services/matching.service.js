@@ -68,13 +68,19 @@ class MatchingService {
             _id: { $ne: profileId, $nin: [...blockedIds, ...interestedIds] },
         }
 
-        // Gender filter - prefer partner preference gender, fallback to opposite
-        if (preferences?.gender) {
-            query.gender = preferences.gender
-        } else if (profile.gender === "male") {
-            query.gender = "female"
-        } else if (profile.gender === "female") {
-            query.gender = "male"
+        // Gender filter - strictly enforce opposite gender matching: boy sees only girls, girl sees only boys
+        const userGender = String(profile.gender || "").toLowerCase().trim()
+        let targetGender = null
+        if (userGender === "male") {
+            targetGender = "female"
+        } else if (userGender === "female") {
+            targetGender = "male"
+        } else if (preferences?.gender) {
+            targetGender = String(preferences.gender).toLowerCase().trim()
+        }
+
+        if (targetGender) {
+            query.gender = new RegExp(`^${targetGender}$`, "i")
         }
 
         // Apply preference filters
@@ -159,7 +165,11 @@ class MatchingService {
             const fallbackQuery = {
                 _id: { $ne: profileId, $nin: blockedIds },
             }
-            if (query.gender) fallbackQuery.gender = query.gender
+            if (targetGender) {
+                fallbackQuery.gender = new RegExp(`^${targetGender}$`, "i")
+            } else if (query.gender) {
+                fallbackQuery.gender = query.gender
+            }
 
             const [fallbackCandidates, fallbackTotal] = await Promise.all([
                 Profile.find(fallbackQuery)

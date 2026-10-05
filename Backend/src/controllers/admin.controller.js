@@ -264,6 +264,51 @@ class AdminController {
             return apiResponse.error(error.message, error.statusCode || 500)
         }
     }
+
+    /**
+     * GET /api/v1/admin/confirmations
+     */
+    async getConfirmations(req, res) {
+        const apiResponse = new ApiResponse(res)
+        try {
+            const data = await adminService.getConfirmations(req.query)
+            return apiResponse.success(data, "Confirmations retrieved successfully")
+        } catch (error) {
+            console.error("Admin getConfirmations error:", error)
+            return apiResponse.error(error.message, error.statusCode || 500)
+        }
+    }
+
+    /**
+     * POST /api/v1/admin/confirmations/:id/accept
+     * POST /api/v1/admin/users/:id/approve
+     */
+    async approveConfirmationUser(req, res) {
+        const apiResponse = new ApiResponse(res)
+        try {
+            const data = await adminService.approveConfirmationUser(req.params.id, req.userId)
+            return apiResponse.success(data, data.message || "User approved successfully")
+        } catch (error) {
+            console.error("Admin approveConfirmationUser error:", error)
+            return apiResponse.error(error.message, error.statusCode || 500)
+        }
+    }
+
+    /**
+     * POST /api/v1/admin/confirmations/:id/decline
+     * POST /api/v1/admin/users/:id/decline
+     */
+    async declineConfirmationUser(req, res) {
+        const apiResponse = new ApiResponse(res)
+        try {
+            const reason = req.body?.reason || "Profile submission declined by administration"
+            const data = await adminService.declineConfirmationUser(req.params.id, req.userId, reason)
+            return apiResponse.success(data, data.message || "User declined")
+        } catch (error) {
+            console.error("Admin declineConfirmationUser error:", error)
+            return apiResponse.error(error.message, error.statusCode || 500)
+        }
+    }
 }
 
 export default new AdminController()

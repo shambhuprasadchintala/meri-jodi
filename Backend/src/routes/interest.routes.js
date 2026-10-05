@@ -1,6 +1,6 @@
 import express from "express"
 import interestController from "../controllers/interest.controller.js"
-import { attachUser } from "../middlewares/auth.js"
+import { attachUser, requireApproved } from "../middlewares/auth.js"
 import { validate } from "../middlewares/validate.js"
 import { validateObjectId } from "../validators/shared.validator.js"
 import { sendInterest } from "../validators/interest.validator.js"
@@ -8,6 +8,7 @@ import { sendInterest } from "../validators/interest.validator.js"
 const router = express.Router()
 
 router.use(attachUser)
+router.use(requireApproved)
 
 router.get("/sent", interestController.getSentInterests.bind(interestController))
 router.get("/received", interestController.getReceivedInterests.bind(interestController))

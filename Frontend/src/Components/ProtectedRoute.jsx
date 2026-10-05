@@ -1,7 +1,8 @@
 import { Navigate } from "react-router-dom"
 import { useAuth } from "../context/AuthContext"
+import PendingApprovalScreen from "./PendingApprovalScreen"
 
-const ProtectedRoute = ({ children, adminOnly = false }) => {
+const ProtectedRoute = ({ children, adminOnly = false, requireApproved = true }) => {
   const { user, loading } = useAuth()
 
   if (loading) {
@@ -21,6 +22,10 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
 
   if (adminOnly && user.role !== "admin") {
     return <Navigate to="/home" replace />
+  }
+
+  if (requireApproved && !user.isApproved && user.role !== "admin") {
+    return <PendingApprovalScreen />
   }
 
   return children

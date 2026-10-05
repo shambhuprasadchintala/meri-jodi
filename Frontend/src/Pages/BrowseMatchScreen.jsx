@@ -11,8 +11,7 @@ import Navbar from "../Components/Navbar"
 import Footer from "../Components/Footer"
 import MatchCard from "../Components/MatchCard"
 import ConfirmInterestModal from "../Components/ConfirmInterestModal"
-import femaleProfile from "../assets/female_profile2.jpg"
-import userImage from "../assets/user.jpg"
+import defaultAvatar from "../assets/default-avatar.svg"
 import { getMyMatches } from "../api/matchingApi"
 import { getMyProfile } from "../api/profileApi"
 import { sendInterest, getSentInterests, getReceivedInterests } from "../api/interestApi"
@@ -21,7 +20,7 @@ import { getWhoViewedYou } from "../api/dashboardApi"
 import { calculateAge } from "../utils/formatters"
 
 const mapProfileToCard = (profile) => {
-    const fallbackPhoto = profile.gender === "female" ? femaleProfile : userImage
+    const fallbackPhoto = defaultAvatar
     const tags = [
         profile.lifestyle?.diet ? `${profile.lifestyle.diet}` : null,
         profile.religion,

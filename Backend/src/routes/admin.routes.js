@@ -20,6 +20,18 @@ router.get("/stats", adminController.getStats.bind(adminController))
 router.get("/health", adminController.getHealth.bind(adminController))
 router.get("/activity-logs", adminController.getActivityLogs.bind(adminController))
 
+// Confirmation & Approvals Queue
+router.get("/confirmations", adminController.getConfirmations.bind(adminController))
+router.get("/confirmation-users", adminController.getConfirmations.bind(adminController))
+router.post("/confirmations/:id/accept", validateObjectId("id"), validate, adminController.approveConfirmationUser.bind(adminController))
+router.put("/confirmations/:id/accept", validateObjectId("id"), validate, adminController.approveConfirmationUser.bind(adminController))
+router.post("/confirmations/:id/decline", validateObjectId("id"), validate, adminController.declineConfirmationUser.bind(adminController))
+router.put("/confirmations/:id/decline", validateObjectId("id"), validate, adminController.declineConfirmationUser.bind(adminController))
+router.post("/users/:id/approve", validateObjectId("id"), validate, adminController.approveConfirmationUser.bind(adminController))
+router.put("/users/:id/approve", validateObjectId("id"), validate, adminController.approveConfirmationUser.bind(adminController))
+router.post("/users/:id/decline", validateObjectId("id"), validate, adminController.declineConfirmationUser.bind(adminController))
+router.put("/users/:id/decline", validateObjectId("id"), validate, adminController.declineConfirmationUser.bind(adminController))
+
 // Platform Settings & Admin Profile
 router.get("/settings", adminController.getSettings.bind(adminController))
 router.put("/settings", adminController.updateSettings.bind(adminController))

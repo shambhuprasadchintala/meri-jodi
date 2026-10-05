@@ -1,7 +1,6 @@
 import { Heart } from "lucide-react"
 import { formatMaskedSurname } from "../utils/formatters"
-import femaleProfile from "../assets/female_profile2.jpg"
-import userImage from "../assets/user.jpg"
+import defaultAvatar from "../assets/default-avatar.svg"
 
 export default function ConfirmInterestModal({
     isOpen,
@@ -15,7 +14,7 @@ export default function ConfirmInterestModal({
 }) {
     if (!isOpen) return null
 
-    const fallbackPhoto = gender === "female" ? femaleProfile : userImage
+    const fallbackPhoto = defaultAvatar
     const rawName = profile?.name || profileName || "Member"
     const displayName = formatMaskedSurname(rawName)
     const displayImage = profileImage || profile?.image || profile?.photos?.[0]?.url || fallbackPhoto

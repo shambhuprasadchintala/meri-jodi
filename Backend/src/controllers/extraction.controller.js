@@ -4,22 +4,9 @@ import ApiResponse from "../utils/ApiResponse.js"
 class ExtractionController {
     async extractBiodata(req, res) {
         const apiResponse = new ApiResponse(res)
-        try {
-            if (!req.file && !req.body?.text) {
-                return apiResponse.error("No file uploaded.", 400)
-            }
-
-            let data
-            if (req.file) {
-                data = await extractionService.extractBiodata(req.file.buffer, req.file.mimetype)
-            } else {
-                data = await extractionService.extractBiodata(Buffer.from(req.body.text, "utf-8"), "text/plain")
-            }
-            return apiResponse.success(data, "Biodata extracted successfully")
-        } catch (error) {
-            console.error("Extraction error:", error)
-            return apiResponse.error(error.message, error.statusCode || 500)
-        }
+        // [COMMENTED OUT: AI BIODATA DOCUMENT EXTRACTION]
+        // Document extraction has been disabled. Users must manually type their profile details.
+        return apiResponse.error("Document extraction is disabled. Please enter your profile details manually.", 400)
     }
 
     async generateBio(req, res) {

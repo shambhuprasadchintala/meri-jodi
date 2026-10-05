@@ -1,11 +1,13 @@
-import { useState, useRef } from "react";
+import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import registerPageImage from "../assets/login-image.png";
 import logo from "../assets/logo2.png";
-import axiosInstance from "../api/axiosInstance";
 
-const UploadBiodataPage = () => {
-  const navigate = useNavigate();
+// [COMMENTED OUT: FRONTEND AI BIODATA & DOCUMENT EXTRACTION LOGIC]
+// Document extraction has been disabled across the platform.
+// Users must manually fill in all personal, education, career, and family details.
+/*
+const UploadBiodataExtractionModule = () => {
   const fileInputRef = useRef(null);
   const [uploadedFile, setUploadedFile] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -48,17 +50,6 @@ const UploadBiodataPage = () => {
     setUploadedFile(file);
   };
 
-  const handleBrowseClick = () => {
-    fileInputRef.current?.click();
-  };
-  
-
-  const handleInputChange = (e) => {
-    if (e.target.files && e.target.files.length > 0) {
-      handleFileSelect(e.target.files[0]);
-    }
-  };
-
   const handleGenerate = async () => {
     if (!uploadedFile) {
       setError("Please upload a biodata file first.");
@@ -92,6 +83,19 @@ const UploadBiodataPage = () => {
       setLoading(false);
     }
   };
+};
+*/
+
+const UploadBiodataPage = () => {
+  const navigate = useNavigate();
+
+  // Automatically forward users to manual details entry
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      navigate("/add-details", { replace: true });
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [navigate]);
 
   return (
     <div className="min-h-screen w-full flex bg-white">
@@ -111,131 +115,43 @@ const UploadBiodataPage = () => {
         </div>
 
         <div className="max-w-2xl">
-          <div className="mb-10">
+          <div className="mb-8">
             <button
               onClick={() => navigate("/complete-profile")}
-              className="text-sm text-[#ED5463] hover:text-[#D63E52] font-medium mb-6 flex items-center gap-1 transition-colors"
+              className="text-sm text-[#ED5463] hover:text-[#D63E52] font-medium mb-6 flex items-center gap-1 transition-colors cursor-pointer"
             >
               ← Go Back
             </button>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              Upload Biodata
+              Manual Profile Entry
             </h1>
-            <p className="text-[#6B7280] text-sm">
-              Upload your biodata PDF and our AI will automatically extract your
-              details to create your profile quickly and accurately.
+            <p className="text-[#6B7280] text-sm leading-relaxed">
+              Automated document extraction has been disabled to ensure the highest accuracy of matrimonial details. Please enter your profile details manually.
             </p>
           </div>
 
-          {/* Upload Area */}
-          <div
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            className={`border-2 border-dashed rounded-2xl p-12 text-center transition-colors mb-8 ${
-              isDragging
-                ? "border-[#ED5463] bg-[#FEF2F2]"
-                : "border-[#E5E7EB] bg-white"
-            } ${uploadedFile ? "bg-[#F9FAFB]" : ""}`}
-          >
-            {uploadedFile ? (
-              <div className="flex flex-col items-center gap-3">
-                <div className="w-12 h-12 bg-[#ED5463] rounded-full flex items-center justify-center">
-                  <svg
-                    className="w-6 h-6 text-white"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M5 13l4 4L19 7"
-                    />
-                  </svg>
-                </div>
-                <p className="text-gray-900 font-semibold">
-                  {uploadedFile.name}
-                </p>
-                <p className="text-sm text-[#6B7280]">
-                  {(uploadedFile.size / 1024).toFixed(2)} KB
-                </p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setUploadedFile(null);
-                    fileInputRef.current?.click();
-                  }}
-                  className="text-[#ED5463] text-sm font-semibold hover:underline mt-2"
-                >
-                  Change File
-                </button>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center gap-4">
-                <svg
-                  className="w-12 h-12 text-[#D1D5DB]"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.5}
-                    d="M12 16v-4m0 0V8m0 4h4m-4 0H8m4-12c4.42 0 8 3.58 8 8s-3.58 8-8 8-8-3.58-8-8 3.58-8 8-8z"
-                  />
-                </svg>
-                <p className="text-gray-900 font-semibold">Drop PDF here</p>
-                <p className="text-sm text-[#6B7280]">or</p>
-                <button
-                  type="button"
-                  onClick={handleBrowseClick}
-                  className="text-[#ED5463] font-semibold border border-[#ED5463] px-6 py-2 rounded-full hover:bg-[#FEF2F2] transition-colors"
-                >
-                  Browse Files
-                </button>
-                <p className="text-xs text-[#9CA3AF] mt-2">
-                  PDF, JPG, PNG up to 10MB
-                </p>
-              </div>
-            )}
+          <div className="p-8 border-2 border-rose-200 bg-rose-50/30 rounded-2xl text-center mb-8">
+            <h3 className="text-lg font-bold text-gray-900 mb-2 font-serif">
+              Step-by-Step Profile Creation
+            </h3>
+            <p className="text-sm text-gray-600 mb-6 max-w-md mx-auto">
+              Fill in your personal background, education, profession, family values, and partner preferences in just a few minutes.
+            </p>
 
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".pdf,.jpg,.jpeg,.png"
-              onChange={handleInputChange}
-              className="hidden"
-            />
+            <button
+              onClick={() => navigate("/add-details")}
+              className="bg-[#842029] hover:bg-[#6b1b27] text-white px-8 py-3.5 rounded-full font-bold text-sm shadow-md transition-all cursor-pointer"
+            >
+              Fill Profile Details Manually &rarr;
+            </button>
           </div>
 
-          {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-sm text-red-600">{error}</p>
-            </div>
-          )}
-
-          {/* Generate Button */}
-          <button
-            onClick={handleGenerate}
-            disabled={!uploadedFile}
-            className={`w-full rounded-full py-3 font-semibold text-white transition-all ${
-              uploadedFile
-                ? "bg-[#ED5463] hover:bg-[#D63E52] cursor-pointer"
-                : "bg-[#ED5463] opacity-50 cursor-not-allowed"
-            }`}
-          >
-            {loading ? "Processing..." : "Generate My Profile"}
-          </button>
-
-          {/* Help Section */}
-          <div className="mt-12 flex items-center justify-center gap-3">
-            <span className="text-sm text-[#6B7280]">Need Help? Call</span>
-            <span className="text-sm font-semibold text-gray-900">
-              22211333555
-            </span>
+          {/* Support Section */}
+          <div className="mt-8 flex items-center justify-center gap-2 text-sm text-gray-600 bg-gray-50 p-3.5 rounded-xl border border-gray-100">
+            <span>Need Help? Call Support:</span>
+            <a href="tel:+918446360709" className="font-bold text-[#842029] hover:underline">
+              +91 84463 60709
+            </a>
           </div>
         </div>
       </div>

@@ -3,8 +3,7 @@ import { useNavigate } from "react-router-dom"
 import { Star, Heart, Trash2, MapPin, Briefcase, GraduationCap, ArrowRight } from "lucide-react"
 import Navbar from "../Components/Navbar"
 import Footer from "../Components/Footer"
-import userImage from "../assets/user.jpg"
-import femaleProfile from "../assets/female_profile2.jpg"
+import defaultAvatar from "../assets/default-avatar.svg"
 import { getShortlistedProfiles, toggleShortlist } from "../api/shortlistApi"
 import { sendInterest } from "../api/interestApi"
 import { useToast } from "../context/ToastContext"
@@ -127,7 +126,7 @@ export default function ShortlistPage() {
                             const pId = profile._id || profile.id
                             const name = profile.name || profile.userId?.name || "MeriJodi Member"
                             const age = calculateAge(profile.dateOfBirth)
-                            const fallbackPhoto = profile.gender === "female" ? femaleProfile : userImage
+                            const fallbackPhoto = defaultAvatar
                             const photo =
                                 profile.photos?.find((p) => p.isPrimary)?.url ||
                                 profile.photos?.[0]?.url ||

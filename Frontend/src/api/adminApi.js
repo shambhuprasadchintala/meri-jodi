@@ -94,4 +94,19 @@ export const updateAdminPasswordSettings = async (data) => {
     return res.data?.data || res.data
 }
 
+export const getAdminConfirmations = async (params = {}) => {
+    const res = await axiosInstance.get("/admin/confirmations", { params })
+    return res.data?.data || res.data
+}
+
+export const approveAdminConfirmation = async (id) => {
+    const res = await axiosInstance.post(`/admin/confirmations/${id}/accept`)
+    return res.data?.data || res.data
+}
+
+export const declineAdminConfirmation = async (id, reason = "") => {
+    const res = await axiosInstance.post(`/admin/confirmations/${id}/decline`, { reason })
+    return res.data?.data || res.data
+}
+
 

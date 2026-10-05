@@ -261,6 +261,26 @@ export default function SettingsPage() {
                                 </button>
                             </div>
                         </div>
+
+                        {/* Support Card */}
+                        <div className="mt-4 bg-white rounded-2xl shadow-sm border border-rose-100 p-4.5 text-xs text-gray-600">
+                            <p className="font-bold text-gray-900 text-sm mb-1 text-[#842029]">Need Help or Support?</p>
+                            <p className="text-gray-500 mb-3">Our support team is available to assist you with profile and account inquiries.</p>
+                            <div className="space-y-1.5">
+                                <div className="flex items-center gap-2">
+                                    <Phone size={14} className="text-[#842029]" />
+                                    <a href="tel:+918446360709" className="font-bold text-[#842029] hover:underline">
+                                        +91 84463 60709
+                                    </a>
+                                </div>
+                                <div className="flex items-center gap-2 text-gray-500">
+                                    <span>✉</span>
+                                    <a href="mailto:support@merijodi.com" className="hover:underline">
+                                        support@merijodi.com
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     {/* Content */}

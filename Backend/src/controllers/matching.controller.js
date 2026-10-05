@@ -7,7 +7,14 @@ class MatchingController extends BaseController {
         try {
             let profile = await profileService.getByUserId(req.user._id)
             if (!profile) {
-                profile = await profileService.create(req.user._id, { name: req.user.name })
+                profile = await profileService.create(req.user._id, {
+                    name: req.user.name,
+                    gender: req.user.gender,
+                    location: req.user.location ? { city: req.user.location } : undefined,
+                })
+            } else if (!profile.gender && req.user.gender) {
+                profile.gender = req.user.gender
+                await profile.save()
             }
 
             const result = await matchingService.findMatches(

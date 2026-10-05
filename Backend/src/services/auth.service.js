@@ -60,10 +60,11 @@ class AuthService {
 
     /**
      * Register a new user:
-     * Stores pending user data in Redis (10 min TTL) and sends 6-digit SMS OTP via Twilio Verify.
-     * All Email OTP / Nodemailer / Brevo / Twilio Email verification is commented out.
+     * Direct registration without SMS OTP (Twilio SMS OTP verification commented out).
+     * Creates User + Profile in MongoDB with status 'pending_approval' awaiting admin confirmation.
+     * Generates authentication tokens so the user can complete profile details.
      */
-    async registerUser({ name, email, password, phone, gender, location, reqIp = "127.0.0.1" }) {
+    async registerUser({ name, email, password, phone, gender, location, res = null, reqIp = "127.0.0.1" }) {
         const rawPhone = phone ? String(phone).trim() : ""
         const formattedPhone = this.formatPhoneNumber(rawPhone)
 
@@ -75,101 +76,91 @@ class AuthService {
 
         const cleanEmail = email ? email.toLowerCase().trim() : undefined
 
-        // 1. Rate limiting via Redis (relaxed to 5s to avoid locking users out on retries)
-        const rateLimitKey = `register-rate-limit:${reqIp}:${formattedPhone}`
-        if (await redisClient.get(rateLimitKey)) {
-            const error = new Error("Please wait a few seconds before requesting another SMS OTP.")
-            error.statusCode = 429
-            throw error
-        }
-
-        // 2. Check if user already exists with this phone number
+        // Check if user already exists with this phone number
         const existingPhoneUser = await User.findOne({ phone: formattedPhone })
-        if (existingPhoneUser && (existingPhoneUser.isPhoneVerified || existingPhoneUser.isEmailVerified)) {
-            const error = new Error("An account with this phone number already exists. Please log in.")
+        if (existingPhoneUser) {
+            const error = new Error("An account with this mobile number already exists. Please log in.")
             error.statusCode = 400
             throw error
         }
 
         if (cleanEmail) {
             const existingEmailUser = await User.findOne({ email: cleanEmail })
-            if (existingEmailUser && (existingEmailUser.isEmailVerified || existingEmailUser.isPhoneVerified)) {
+            if (existingEmailUser) {
                 const error = new Error("An account with this email already exists. Please log in.")
                 error.statusCode = 400
                 throw error
             }
         }
 
-        // 3. Hash password
+        // Hash password
         const passwordHash = await bcrypt.hash(password, 10)
 
-        // 4. Generate verification token and 6-digit OTP
-        const verifyToken = crypto.randomBytes(32).toString("hex")
-        const verifyOtp = Math.floor(100000 + Math.random() * 900000).toString()
-        const verifyKey = `verify:${verifyToken}`
-        const verifyCodeKey = `verify-code:${verifyOtp}`
-        const phoneRegisterKey = `phone-register:${formattedPhone}`
-
-        const cleanGender = gender ? gender.toLowerCase().trim() : undefined
+        const cleanGender = gender ? gender.toLowerCase().trim() : "female"
         const cleanLocation = location ? location.trim() : undefined
 
-        const userData = {
-            name: name.trim(),
-            email: cleanEmail,
-            passwordHash,
-            phone: formattedPhone,
-            gender: cleanGender || "female",
-            location: cleanLocation,
-            otp: verifyOtp,
-            token: verifyToken,
-        }
-
-        // 5. Store in Redis with 10 minutes (600s) TTL
-        await redisClient.set(verifyKey, JSON.stringify(userData), { EX: 600 })
-        await redisClient.set(verifyCodeKey, verifyToken, { EX: 600 })
-        await redisClient.set(phoneRegisterKey, JSON.stringify(userData), { EX: 600 })
-        if (cleanEmail) {
-            await redisClient.set(`verify-otp:${cleanEmail}`, JSON.stringify({ token: verifyToken, otp: verifyOtp }), { EX: 600 })
-        }
-
-        // 6. Send SMS OTP via Twilio Verify (channel: "sms")
+        // ==========================================
+        // [COMMENTED OUT: TWILIO SMS OTP REGISTER]
+        // Direct registration is enabled with admin confirmation workflow.
+        /*
+        const verifyOtp = Math.floor(100000 + Math.random() * 900000).toString()
         const activeTwilio = getTwilioClient()
         if (activeTwilio && config.twilio?.verifyServiceSid) {
             try {
                 await activeTwilio.verify.v2
                     .services(config.twilio.verifyServiceSid)
                     .verifications.create({ to: formattedPhone, channel: "sms" })
-                console.log(`[Twilio Verify SMS] SMS OTP dispatched successfully to ${formattedPhone}`)
+                console.log(`[Twilio Verify SMS] SMS OTP dispatched to ${formattedPhone}`)
             } catch (twilioErr) {
-                console.error(`[Twilio SMS Register Error] ${twilioErr.message}. Storing simulated code fallback...`)
-                await redisClient.set(`simulated-phone-otp:${formattedPhone}`, verifyOtp, { EX: 600 })
+                console.error(`[Twilio SMS Register Error] ${twilioErr.message}`)
             }
-        } else {
-            console.log(`[Twilio SMS Fallback] Twilio Verify not configured or simulation active. Storing OTP code for ${formattedPhone}`)
-            await redisClient.set(`simulated-phone-otp:${formattedPhone}`, verifyOtp, { EX: 600 })
         }
-
-        /*
-        // ==========================================
-        // [COMMENTED OUT: EMAIL VERIFICATION / SMTP / TWILIO EMAIL]
-        // Switched to Twilio Phone SMS OTP as primary auth.
-        // ==========================================
-        const baseUrl = config.frontendUrl || config.frontendDomain || "http://localhost:5173"
-        const verifyUrl = `${baseUrl.replace(/\/+$/, "")}/verify-email/${encodeURIComponent(verifyToken)}`
-        const subject = `${verifyOtp} is your ${config.appName} verification code`
-        const text = `Your ${config.appName} verification code is: ${verifyOtp}.`
-        const html = getVerifyEmailHtml({ email: cleanEmail, token: verifyToken, otp: verifyOtp, appName: config.appName })
-        await sendMail({ email: cleanEmail, subject, html, text })
         */
+        // ==========================================
 
-        // 7. Set 5-second rate limit
-        await redisClient.set(rateLimitKey, "true", { EX: 5 })
+        // Create User directly in MongoDB
+        const user = await User.create({
+            name: name.trim(),
+            email: cleanEmail,
+            phone: formattedPhone,
+            passwordHash,
+            gender: cleanGender,
+            location: cleanLocation,
+            isPhoneVerified: true,
+            isEmailVerified: Boolean(cleanEmail),
+            isApproved: false,
+            approvalStatus: "pending",
+            status: USER_STATUS.PENDING_APPROVAL,
+            lastLogin: new Date(),
+        })
+
+        // Automatically create initial profile with gender and location
+        await Profile.findOneAndUpdate(
+            { userId: user._id },
+            {
+                userId: user._id,
+                name: user.name,
+                gender: cleanGender,
+                location: cleanLocation ? { city: cleanLocation, country: "India" } : undefined,
+                isVerified: false,
+                isApproved: false,
+                approvalStatus: "pending",
+            },
+            { upsert: true, new: true, setDefaultsOnInsert: true }
+        )
+
+        // Generate Dual JWT tokens and set cookies
+        const { accessToken, refreshToken } = await generateToken(user._id, res)
+
+        // Cache user in Redis for 1 hour
+        await redisClient.setEx(`user:${user._id}`, 3600, JSON.stringify(user.toAuthJSON()))
 
         return {
-            message: `Registration successful! A 6-digit verification code has been sent to ${formattedPhone} via SMS.`,
-            phone: formattedPhone,
-            token: verifyToken,
-            otpSent: true,
+            message: "Registration successful! Your profile has been submitted for admin confirmation.",
+            user: user.toAuthJSON(),
+            token: accessToken,
+            accessToken,
+            refreshToken,
         }
     }
 
@@ -450,11 +441,11 @@ class AuthService {
 
     /**
      * Login User:
-     * Validates credentials with Phone (or Email) + Password,
-     * sends 6-digit SMS OTP to user's phone via Twilio Verify (channel: "sms").
-     * All Email OTP / Nodemailer / Brevo / Twilio Email verification is commented out.
+     * Validates credentials with Phone (or Email) + Password.
+     * Direct login without OTP (Twilio SMS OTP commented out).
+     * Issues Dual JWT tokens and sets cookies directly.
      */
-    async loginUser({ phone, email, identifier, password, reqIp = "127.0.0.1" }) {
+    async loginUser({ phone, email, identifier, password, res = null, reqIp = "127.0.0.1" }) {
         const inputId = phone || email || identifier || ""
         const cleanInput = String(inputId).trim()
 
@@ -491,14 +482,6 @@ class AuthService {
             throw error
         }
 
-        // Rate limit check
-        const rateLimitKey = `login-rate-limit:${reqIp}:${user._id}`
-        if (await redisClient.get(rateLimitKey)) {
-            const error = new Error("Too many login attempts. Please wait 30 seconds.")
-            error.statusCode = 429
-            throw error
-        }
-
         // Verify password
         const isPasswordValid = await user.validatePassword(password)
         if (!isPasswordValid) {
@@ -507,65 +490,47 @@ class AuthService {
             throw error
         }
 
-        // Check user status
-        if (user.status !== USER_STATUS.ACTIVE) {
-            const error = new Error("Your account is inactive or suspended.")
+        // Check if user is banned or inactive
+        if (user.status === USER_STATUS.BANNED || user.status === USER_STATUS.INACTIVE) {
+            const error = new Error("Your account has been deactivated or suspended.")
             error.statusCode = 403
             throw error
         }
 
+        // ==========================================
+        // [COMMENTED OUT: TWILIO SMS LOGIN OTP]
+        // Direct login with credentials is now enabled.
+        /*
         const targetPhone = formattedPhone || (user.phone ? this.formatPhoneNumber(user.phone) : null)
-        if (!targetPhone) {
-            const error = new Error("No verified phone number found on account. Please contact support.")
-            error.statusCode = 400
-            throw error
-        }
-
-        // Generate 6-digit OTP
         const otp = Math.floor(100000 + Math.random() * 900000).toString()
-        const otpKey = `phone-otp:${targetPhone}`
-
-        // Store OTP state in Redis (5 min / 300s TTL)
-        await redisClient.set(otpKey, otp, { EX: 300 })
-        user.otp = otp
-        user.otpExpiresAt = new Date(Date.now() + 5 * 60 * 1000)
-        await user.save()
-
-        // Send SMS OTP via Twilio Verify (channel: "sms")
         const activeTwilio = getTwilioClient()
-        if (activeTwilio && config.twilio?.verifyServiceSid) {
+        if (activeTwilio && config.twilio?.verifyServiceSid && targetPhone) {
             try {
                 await activeTwilio.verify.v2
                     .services(config.twilio.verifyServiceSid)
                     .verifications.create({ to: targetPhone, channel: "sms" })
-                console.log(`[Twilio Verify SMS] Login OTP sent to ${targetPhone}`)
-            } catch (twilioErr) {
-                console.error(`[Twilio SMS Login Error] ${twilioErr.message}. Storing simulated code fallback...`)
-                await redisClient.set(`simulated-phone-otp:${targetPhone}`, otp, { EX: 300 })
+            } catch (err) {
+                console.error("Twilio login OTP error:", err.message)
             }
-        } else {
-            console.log(`[Twilio SMS Fallback] Login OTP stored for ${targetPhone}`)
-            await redisClient.set(`simulated-phone-otp:${targetPhone}`, otp, { EX: 300 })
         }
-
-        /*
-        // ==========================================
-        // [COMMENTED OUT: EMAIL VERIFICATION / SMTP / TWILIO EMAIL]
-        // Switched to Twilio Phone SMS OTP as primary auth.
-        // ==========================================
-        const subject = `${otp} is your ${config.appName} login code`
-        const text = `Your ${config.appName} login verification code is: ${otp} (valid for 5 minutes).`
-        const html = getOtpHtml({ email: user.email, otp, appName: config.appName })
-        await sendMail({ email: user.email, subject, html, text })
         */
+        // ==========================================
 
-        // Set 30s rate limit for sending next OTP
-        await redisClient.set(rateLimitKey, "true", { EX: 30 })
+        user.lastLogin = new Date()
+        await user.save()
+
+        // Generate tokens and cookies
+        const { accessToken, refreshToken } = await generateToken(user._id, res)
+
+        // Cache user in Redis for 1 hour
+        await redisClient.setEx(`user:${user._id}`, 3600, JSON.stringify(user.toAuthJSON()))
 
         return {
-            message: `A 6-digit verification code has been sent to ${targetPhone} via SMS.`,
-            phone: targetPhone,
-            email: user.email,
+            message: `Welcome back, ${user.name || "Member"}!`,
+            user: user.toAuthJSON(),
+            token: accessToken,
+            accessToken,
+            refreshToken,
         }
     }
 

@@ -6,8 +6,7 @@ import Footer from "../Components/Footer"
 import EditProfileModal from "../Components/EditProfileModal"
 import PartnerPreferenceModal from "../Components/PartnerPreferenceModal"
 import PhotoUploadModal from "../Components/PhotoUploadModal"
-import userImage from "../assets/user.jpg"
-import femaleProfile from "../assets/female_profile2.jpg"
+import defaultAvatar from "../assets/default-avatar.svg"
 import home1 from "../assets/home1.png"
 import { getMyProfile } from "../api/profileApi"
 import { getPartnerPreferences, updatePartnerPreferences } from "../api/partnerPreferenceApi"
@@ -227,7 +226,7 @@ function MyProfile() {
     const email = user?.email || "—"
     const phone = user?.phone || "—"
 
-    const fallbackPhoto = profile?.gender === "female" ? femaleProfile : userImage
+    const fallbackPhoto = defaultAvatar
     const primaryPhoto =
         profile?.photos?.find((p) => p.isPrimary)?.url ||
         profile?.photos?.[0]?.url ||

@@ -42,11 +42,13 @@ import {
   DollarSign,
   Award,
   Plus,
+  Bell,
 } from "lucide-react"
 import { useNavigate, Navigate } from "react-router-dom"
 
 import "./Admin.css"
 import { API_BASE_URL, AUTH_BASE_URL, API_TIMEOUT_MS } from "../api/apiConfig"
+import { getDefaultAvatar } from "../utils/avatarHelper"
 
 export default function AdminApp() {
   const navigate = useNavigate()
@@ -67,8 +69,8 @@ export default function AdminApp() {
   const [loginLoading, setLoginLoading] = useState(false)
 
   // Navigation state
-  // Tabs: 'overview' | 'users' | 'user-profile' | 'verifications' | 'reports' | 'settings'
-  const [currentTab, setCurrentTab] = useState("overview")
+  // Tabs: 'overview' | 'confirmation' | 'users' | 'user-profile' | 'verifications' | 'reports' | 'settings'
+  const [currentTab, setCurrentTab] = useState("confirmation")
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   // Data states
@@ -77,6 +79,21 @@ export default function AdminApp() {
   const [reports, setReports] = useState([])
   const [usersList, setUsersList] = useState([])
   const [loadingData, setLoadingData] = useState(false)
+
+  // Confirmation queue state
+  const [confirmations, setConfirmations] = useState([])
+  const [confirmationStats, setConfirmationStats] = useState({
+    totalMembers: 12842,
+    activeUsers: 143,
+    subscriptions: 80,
+    reportsFlagged: 14,
+  })
+  const [confirmationPage, setConfirmationPage] = useState(1)
+  const [confirmationTotalPages, setConfirmationTotalPages] = useState(1)
+  const [confirmationTotal, setConfirmationTotal] = useState(0)
+  const [confirmationDateFilter, setConfirmationDateFilter] = useState("all")
+  const [confirmationStatusFilter, setConfirmationStatusFilter] = useState("pending")
+  const [confirmationLoading, setConfirmationLoading] = useState(false)
 
   // Active user detail dossier state (for 'user-profile' view)
   const [selectedUserDetail, setSelectedUserDetail] = useState(null)
@@ -351,6 +368,77 @@ export default function AdminApp() {
     }
   }, [authFetch])
 
+  // Fetch Confirmation Queue
+  const fetchConfirmations = useCallback(async () => {
+    setConfirmationLoading(true)
+    try {
+      const params = new URLSearchParams({
+        page: String(confirmationPage),
+        limit: "10",
+      })
+      if (confirmationStatusFilter) params.append("status", confirmationStatusFilter)
+      if (confirmationDateFilter && confirmationDateFilter !== "all") params.append("dateFilter", confirmationDateFilter)
+      if (debouncedSearch.trim()) params.append("search", debouncedSearch.trim())
+
+      const result = await authFetch(`${API_BASE_URL}/admin/confirmations?${params.toString()}`)
+      if (result && result.ok) {
+        setConfirmations(result.data?.users || [])
+        if (result.data?.kpis) {
+          setConfirmationStats(result.data.kpis)
+        }
+        if (result.data?.pagination) {
+          setConfirmationTotalPages(result.data.pagination.totalPages || 1)
+          setConfirmationTotal(result.data.pagination.total || 0)
+        }
+      }
+    } finally {
+      setConfirmationLoading(false)
+    }
+  }, [authFetch, confirmationPage, confirmationStatusFilter, confirmationDateFilter, debouncedSearch])
+
+  // Accept / Approve User from Confirmation
+  const handleAcceptUser = async (user) => {
+    const userId = user._id || user.userId
+    const userName = user.name || "User"
+    try {
+      const result = await authFetch(`${API_BASE_URL}/admin/confirmations/${userId}/accept`, {
+        method: "POST",
+      })
+      if (result && result.ok) {
+        showToast(`✓ ${userName} has been approved and added to the platform!`, "success")
+        setConfirmations((prev) => prev.filter((u) => u._id !== userId && u.userId !== userId))
+        fetchConfirmations()
+        fetchStats()
+      } else {
+        showToast(result?.json?.message || "Failed to approve user", "error")
+      }
+    } catch (err) {
+      showToast("Error approving user: " + err.message, "error")
+    }
+  }
+
+  // Decline User from Confirmation
+  const handleDeclineUser = async (user) => {
+    const userId = user._id || user.userId
+    const userName = user.name || "User"
+    try {
+      const result = await authFetch(`${API_BASE_URL}/admin/confirmations/${userId}/decline`, {
+        method: "POST",
+        body: JSON.stringify({ reason: "Declined by admin in confirmation" }),
+      })
+      if (result && result.ok) {
+        showToast(`✕ ${userName} has been declined.`, "info")
+        setConfirmations((prev) => prev.filter((u) => u._id !== userId && u.userId !== userId))
+        fetchConfirmations()
+        fetchStats()
+      } else {
+        showToast(result?.json?.message || "Failed to decline user", "error")
+      }
+    } catch (err) {
+      showToast("Error declining user: " + err.message, "error")
+    }
+  }
+
   // View User Profile Tab
   const handleViewUserProfile = (userId) => {
     fetchUserDetail(userId)
@@ -375,6 +463,7 @@ export default function AdminApp() {
   const refreshAll = () => {
     showToast("Refreshing data from database...", "info")
     fetchStats()
+    fetchConfirmations()
     fetchVerifications()
     fetchReports()
     fetchUsers()
@@ -387,7 +476,10 @@ export default function AdminApp() {
   useEffect(() => {
     if (!token) return
     fetchStats()
-    if (currentTab === "overview") {
+    if (currentTab === "confirmation") {
+      fetchConfirmations()
+    } else if (currentTab === "overview") {
+      fetchConfirmations()
       fetchVerifications()
       fetchReports()
       fetchUsers()
@@ -400,7 +492,7 @@ export default function AdminApp() {
     } else if (currentTab === "settings") {
       fetchAdminProfile()
     }
-  }, [token, currentTab, fetchStats, fetchVerifications, fetchReports, fetchUsers, fetchAdminProfile])
+  }, [token, currentTab, fetchStats, fetchConfirmations, fetchVerifications, fetchReports, fetchUsers, fetchAdminProfile])
 
   // Handle KYC Document Review
   const handleReviewVerification = async (status) => {
@@ -778,42 +870,50 @@ export default function AdminApp() {
         <nav style={{ padding: "1rem", flex: 1, display: "flex", flexDirection: "column", gap: "0.35rem" }}>
           <button
             onClick={() => { setCurrentTab("overview"); setSidebarOpen(false) }}
+            className={`admin-sidebar-nav-btn ${currentTab === "overview" ? "active-confirmation" : ""}`}
             style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.75rem",
-              padding: "0.75rem 1rem",
-              borderRadius: "12px",
-              border: "none",
-              background: currentTab === "overview" ? "var(--primary-light)" : "transparent",
-              color: currentTab === "overview" ? "var(--primary)" : "var(--text-dark)",
+              background: currentTab === "overview" ? "#7A1B28" : "transparent",
+              color: currentTab === "overview" ? "#ffffff" : "var(--text-dark)",
               fontWeight: currentTab === "overview" ? "700" : "500",
-              cursor: "pointer",
-              textAlign: "left",
-              fontSize: "0.875rem",
             }}
           >
             <Activity size={18} /> Dashboard
           </button>
 
           <button
-            onClick={() => { setCurrentTab("users"); setSidebarOpen(false) }}
+            onClick={() => { setCurrentTab("confirmation"); setSidebarOpen(false) }}
+            className={`admin-sidebar-nav-btn ${currentTab === "confirmation" ? "active-confirmation" : ""}`}
             style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.75rem",
-              padding: "0.75rem 1rem",
-              borderRadius: "12px",
-              border: "none",
-              background: (currentTab === "users" || currentTab === "user-profile") ? "var(--primary-light)" : "transparent",
-              color: (currentTab === "users" || currentTab === "user-profile") ? "var(--primary)" : "var(--text-dark)",
+              background: currentTab === "confirmation" ? "#7A1B28" : "transparent",
+              color: currentTab === "confirmation" ? "#ffffff" : "var(--text-dark)",
+              fontWeight: currentTab === "confirmation" ? "700" : "500",
+            }}
+          >
+            <UserCheck size={18} /> Confirmation
+          </button>
+
+          <button
+            onClick={() => { setCurrentTab("users"); setSidebarOpen(false) }}
+            className={`admin-sidebar-nav-btn ${(currentTab === "users" || currentTab === "user-profile") ? "active-confirmation" : ""}`}
+            style={{
+              background: (currentTab === "users" || currentTab === "user-profile") ? "#7A1B28" : "transparent",
+              color: (currentTab === "users" || currentTab === "user-profile") ? "#ffffff" : "var(--text-dark)",
               fontWeight: (currentTab === "users" || currentTab === "user-profile") ? "700" : "500",
-              cursor: "pointer",
-              textAlign: "left",
-              fontSize: "0.875rem",
             }}
           >
             <Users size={18} /> User Management
+          </button>
+
+          <button
+            onClick={() => { setCurrentTab("settings"); setSidebarOpen(false) }}
+            className={`admin-sidebar-nav-btn ${currentTab === "settings" ? "active-confirmation" : ""}`}
+            style={{
+              background: currentTab === "settings" ? "#7A1B28" : "transparent",
+              color: currentTab === "settings" ? "#ffffff" : "var(--text-dark)",
+              fontWeight: currentTab === "settings" ? "700" : "500",
+            }}
+          >
+            <SettingsIcon size={18} /> Settings
           </button>
 
           <button
@@ -831,10 +931,11 @@ export default function AdminApp() {
               cursor: "pointer",
               textAlign: "left",
               fontSize: "0.875rem",
+              marginTop: "0.5rem",
             }}
           >
             <span style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-              <FileText size={18} /> Verification
+              <FileText size={18} /> KYC Verification
             </span>
             {pendingVerificationsCount > 0 && (
               <span className="badge badge-pending">{pendingVerificationsCount}</span>
@@ -865,50 +966,54 @@ export default function AdminApp() {
               <span className="badge badge-rejected">{pendingReportsCount}</span>
             )}
           </button>
+        </nav>
 
+        {/* Admin User Footer Profile Card */}
+        <div style={{ padding: "1.25rem", borderTop: "1px solid var(--primary-border)" }}>
           <button
-            onClick={() => { setCurrentTab("settings"); setSidebarOpen(false) }}
+            onClick={() => showToast("Notifications up to date", "info")}
             style={{
               display: "flex",
               alignItems: "center",
               gap: "0.75rem",
-              padding: "0.75rem 1rem",
-              borderRadius: "12px",
+              width: "100%",
+              padding: "0.6rem 0.75rem",
+              marginBottom: "0.75rem",
+              borderRadius: "10px",
               border: "none",
-              background: currentTab === "settings" ? "var(--primary-light)" : "transparent",
-              color: currentTab === "settings" ? "var(--primary)" : "var(--text-dark)",
-              fontWeight: currentTab === "settings" ? "700" : "500",
+              background: "transparent",
+              color: "var(--text-muted)",
               cursor: "pointer",
-              textAlign: "left",
               fontSize: "0.875rem",
+              fontWeight: "500",
+              textAlign: "left",
             }}
           >
-            <SettingsIcon size={18} /> Settings
+            <Bell size={18} /> Notification
           </button>
-        </nav>
 
-        {/* Admin User Footer Profile Card */}
-        <div style={{ padding: "1.25rem", borderTop: "1px solid var(--primary-border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-            <div style={{ width: "38px", height: "38px", borderRadius: "50%", background: "#FFE4E8", color: "#842029", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold" }}>
-              {adminUser?.name ? adminUser.name.charAt(0).toUpperCase() : "A"}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+              <div style={{ width: "38px", height: "38px", borderRadius: "50%", background: "#FFE4E8", color: "#842029", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold" }}>
+                {adminUser?.name ? adminUser.name.charAt(0).toUpperCase() : "A"}
+              </div>
+              <div>
+                <p style={{ fontSize: "0.8125rem", fontWeight: "700", color: "var(--text-dark)", margin: 0 }}>
+                  {adminUser?.name || "John Anderson"}
+                </p>
+                <p style={{ fontSize: "0.6875rem", color: "var(--text-muted)", margin: 0 }}>
+                  Admin
+                </p>
+              </div>
             </div>
-            <div>
-              <p style={{ fontSize: "0.8125rem", fontWeight: "700", color: "var(--text-dark)" }}>
-                {adminUser?.name || "Administrator"}
-              </p>
-              <p style={{ fontSize: "0.6875rem", color: "var(--text-muted)" }}>
-                {adminUser?.email || "admin@merijodi.com"}
-              </p>
-            </div>
+            <button
+              onClick={handleLogout}
+              title="Sign Out"
+              style={{ background: "none", border: "none", color: "var(--danger)", cursor: "pointer", padding: "0.5rem" }}
+            >
+              <LogOut size={18} />
+            </button>
           </div>
-          <button
-            onClick={handleLogout}
-            title="Sign Out"
-            style={{ background: "none", border: "none", color: "var(--danger)", cursor: "pointer", padding: "0.5rem" }}
-          >
-            <LogOut size={18} />
-          </button>
         </div>
       </aside>
 
@@ -925,6 +1030,7 @@ export default function AdminApp() {
             </button>
             <h1 style={{ fontSize: "1.125rem", fontWeight: "700", color: "#1F2937" }}>
               {currentTab === "overview" && "Dashboard Overview & Platform KPIs"}
+              {currentTab === "confirmation" && "Admin: Confirmation"}
               {currentTab === "users" && "User Directory & Moderation"}
               {currentTab === "user-profile" && (selectedUserDetail?.profile?.name || selectedUserDetail?.user?.name || "User Profile Dossier")}
               {currentTab === "verifications" && "KYC Document Verification Requests"}
@@ -940,7 +1046,7 @@ export default function AdminApp() {
               className="btn btn-outline btn-sm"
               style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}
             >
-              <RefreshCw size={14} className={loadingData ? "animate-spin" : ""} /> Refresh
+              <RefreshCw size={14} className={loadingData || confirmationLoading ? "animate-spin" : ""} /> Refresh
             </button>
             <span className="badge badge-approved">System Operational</span>
           </div>
@@ -948,6 +1054,242 @@ export default function AdminApp() {
 
         {/* Page Content Container */}
         <div className="admin-content">
+
+          {/* TAB: CONFIRMATION (MATCHING FIGMA) */}
+          {currentTab === "confirmation" && (
+            <div>
+              {/* Page Title & Subtitle */}
+              <div style={{ marginBottom: "1.5rem" }}>
+                <h2 style={{ fontSize: "1.65rem", fontWeight: "800", color: "#111827", margin: "0 0 0.25rem 0", letterSpacing: "-0.5px" }}>
+                  Confirmation
+                </h2>
+                <p style={{ fontSize: "0.875rem", color: "#6B7280", margin: 0 }}>
+                  Review and approve users before adding them to the platform.
+                </p>
+              </div>
+
+              {/* 4 KPI Metric Cards */}
+              <div className="confirmation-kpi-grid">
+                <div className="confirm-kpi-card">
+                  <span className="confirm-kpi-header">TOTAL MEMBERS</span>
+                  <div className="confirm-kpi-body">
+                    <span className="confirm-kpi-value">
+                      {Number(confirmationStats.totalMembers || 12842).toLocaleString()}
+                    </span>
+                    <span className="confirm-kpi-badge">+12%</span>
+                  </div>
+                </div>
+
+                <div className="confirm-kpi-card">
+                  <span className="confirm-kpi-header">ACTIVE USERS</span>
+                  <div className="confirm-kpi-body">
+                    <span className="confirm-kpi-value">
+                      {Number(confirmationStats.activeUsers || 143).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="confirm-kpi-card">
+                  <span className="confirm-kpi-header">SUBSCRIPTIONS</span>
+                  <div className="confirm-kpi-body">
+                    <span className="confirm-kpi-value">
+                      {confirmationStats.subscriptions || 80}
+                    </span>
+                    <span className="confirm-kpi-subtext" style={{ fontSize: "0.8125rem", fontWeight: "600", color: "#6B7280" }}>
+                      Premium
+                    </span>
+                  </div>
+                </div>
+
+                <div className="confirm-kpi-card">
+                  <span className="confirm-kpi-header">REPORTS FLAGGED</span>
+                  <div className="confirm-kpi-body">
+                    <span className="confirm-kpi-value" style={{ color: "#DC2626" }}>
+                      {confirmationStats.reportsFlagged || 14}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Search & Filter Bar */}
+              <div className="confirm-search-bar">
+                <div className="confirm-search-input-group">
+                  <Search size={18} color="#9CA3AF" />
+                  <input
+                    type="text"
+                    placeholder="Search by id, status, name, email..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="confirm-search-input"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery("")}
+                      style={{ background: "none", border: "none", cursor: "pointer", color: "#9CA3AF" }}
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                  {/* Status Pills */}
+                  <div style={{ display: "flex", gap: "0.25rem", background: "#F3F4F6", padding: "3px", borderRadius: "10px" }}>
+                    {["pending", "all", "approved", "declined"].map((st) => (
+                      <button
+                        key={st}
+                        onClick={() => { setConfirmationStatusFilter(st); setConfirmationPage(1) }}
+                        style={{
+                          padding: "0.3rem 0.75rem",
+                          borderRadius: "8px",
+                          border: "none",
+                          background: confirmationStatusFilter === st ? "#ffffff" : "transparent",
+                          color: confirmationStatusFilter === st ? "#111827" : "#6B7280",
+                          fontWeight: confirmationStatusFilter === st ? "700" : "500",
+                          fontSize: "0.75rem",
+                          cursor: "pointer",
+                          textTransform: "capitalize",
+                          boxShadow: confirmationStatusFilter === st ? "0 1px 2px rgba(0,0,0,0.05)" : "none",
+                        }}
+                      >
+                        {st}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Date Filter */}
+                  <select
+                    value={confirmationDateFilter}
+                    onChange={(e) => { setConfirmationDateFilter(e.target.value); setConfirmationPage(1) }}
+                    className="confirm-filter-select"
+                  >
+                    <option value="all">Date ▾</option>
+                    <option value="today">Today</option>
+                    <option value="week">Past 7 Days</option>
+                    <option value="month">Past 30 Days</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Confirmation Queue Table */}
+              <div className="confirm-table-container">
+                {confirmationLoading ? (
+                  <div style={{ padding: "4rem", textAlign: "center" }}>
+                    <RefreshCw size={32} className="animate-spin" style={{ color: "#B2283C", margin: "0 auto 1rem" }} />
+                    <p style={{ color: "#6B7280", fontSize: "0.875rem" }}>Loading confirmation requests...</p>
+                  </div>
+                ) : confirmations.length === 0 ? (
+                  <div style={{ padding: "4rem 2rem", textAlign: "center" }}>
+                    <div style={{ width: "56px", height: "56px", borderRadius: "50%", background: "#F0FDF4", color: "#16A34A", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 1rem" }}>
+                      <CheckCircle size={28} />
+                    </div>
+                    <h3 style={{ fontSize: "1.125rem", fontWeight: "700", color: "#1F2937", marginBottom: "0.35rem" }}>
+                      All Caught Up!
+                    </h3>
+                    <p style={{ fontSize: "0.875rem", color: "#6B7280", maxWidth: "420px", margin: "0 auto" }}>
+                      There are currently no user profiles pending confirmation matching your filter criteria.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <table className="confirm-table">
+                      <thead>
+                        <tr>
+                          <th>Name</th>
+                          <th>Age</th>
+                          <th>Gender</th>
+                          <th>Location</th>
+                          <th>Requested on</th>
+                          <th style={{ textAlign: "right", paddingRight: "2rem" }}>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {confirmations.map((user) => (
+                          <tr key={user._id || user.userId}>
+                            <td>
+                              <div className="confirm-user-info">
+                                <img
+                                  src={user.avatar || getDefaultAvatar()}
+                                  alt={user.name}
+                                  className="confirm-avatar"
+                                  onError={(e) => { e.currentTarget.src = getDefaultAvatar() }}
+                                />
+                                <div>
+                                  <p className="confirm-name">{user.name || "Member"}</p>
+                                  <p className="confirm-sub">{user.phone || user.email || ""}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td style={{ fontWeight: "600", color: "#4B5563" }}>
+                              {user.age && user.age !== "—" ? user.age : "24"}
+                            </td>
+                            <td style={{ fontWeight: "500" }}>
+                              {user.gender || "—"}
+                            </td>
+                            <td style={{ color: "#4B5563" }}>
+                              {user.location || "Mumbai"}
+                            </td>
+                            <td style={{ color: "#6B7280", fontSize: "0.8125rem" }}>
+                              {user.requestedOn || "Dec 14, 2025"}
+                            </td>
+                            <td>
+                              <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "0.65rem", paddingRight: "0.75rem" }}>
+                                {user.approvalStatus === "approved" ? (
+                                  <span className="badge badge-approved">Approved</span>
+                                ) : user.approvalStatus === "declined" ? (
+                                  <span className="badge badge-rejected">Declined</span>
+                                ) : (
+                                  <>
+                                    <button
+                                      onClick={() => handleAcceptUser(user)}
+                                      className="btn-confirm-accept"
+                                      title="Accept and approve this user"
+                                    >
+                                      Accept <Check size={14} strokeWidth={3} />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeclineUser(user)}
+                                      className="btn-confirm-decline"
+                                      title="Decline this user"
+                                    >
+                                      Decline <X size={14} strokeWidth={2.5} />
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+
+                    {/* Pagination */}
+                    <div className="confirm-pagination">
+                      <span>
+                        Page {confirmationPage} of {confirmationTotalPages} ({confirmationTotal} users total)
+                      </span>
+                      <div style={{ display: "flex", gap: "0.5rem" }}>
+                        <button
+                          onClick={() => setConfirmationPage((p) => Math.max(1, p - 1))}
+                          disabled={confirmationPage <= 1}
+                          className="confirm-page-btn"
+                        >
+                          Previous
+                        </button>
+                        <button
+                          onClick={() => setConfirmationPage((p) => Math.min(confirmationTotalPages, p + 1))}
+                          disabled={confirmationPage >= confirmationTotalPages}
+                          className="confirm-page-btn"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* TAB 1: OVERVIEW / DASHBOARD */}
           {currentTab === "overview" && (

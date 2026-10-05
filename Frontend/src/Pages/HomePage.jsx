@@ -6,8 +6,7 @@ import Footer from "../Components/Footer"
 import PhotoUploadModal from "../Components/PhotoUploadModal"
 import home1 from "../assets/home1.png"
 import home4 from "../assets/home4.png"
-import femaleProfile from "../assets/female_profile2.jpg"
-import userImage from "../assets/user.jpg"
+import defaultAvatar from "../assets/default-avatar.svg"
 import { useAuth } from "../context/AuthContext"
 import { getMyProfile, getRecommendedMatches, getWhoViewedYou } from "../api/dashboardApi"
 import { formatMaskedSurname, calculateAge } from "../utils/formatters"
@@ -25,7 +24,7 @@ const COLORS = {
 }
 
 const mapProfileToCard = (profile) => {
-  const fallback = profile.gender === "female" ? femaleProfile : userImage
+  const fallback = defaultAvatar
   const isPhotoHidden = !!profile.isPhotoHidden
   return {
     id: profile._id || profile.id,

@@ -45,7 +45,7 @@ export const authenticate = async (req, res, next) => {
         if (cachedUserJson) {
             try {
                 const cachedUser = JSON.parse(cachedUserJson)
-                if (cachedUser.status && cachedUser.status !== USER_STATUS.ACTIVE) {
+                if (cachedUser.status && (cachedUser.status === USER_STATUS.BANNED || cachedUser.status === USER_STATUS.INACTIVE)) {
                     return res.status(403).json({
                         success: false,
                         message: "Your account is inactive or banned",
@@ -67,7 +67,7 @@ export const authenticate = async (req, res, next) => {
             })
         }
 
-        if (user.status !== USER_STATUS.ACTIVE) {
+        if (user.status === USER_STATUS.BANNED || user.status === USER_STATUS.INACTIVE) {
             return res.status(403).json({
                 success: false,
                 message: "Your account is inactive or banned",
@@ -91,6 +91,41 @@ export const authenticate = async (req, res, next) => {
             success: false,
             message: "Invalid or expired auth token",
         })
+    }
+}
+
+export const requireApproved = async (req, res, next) => {
+    try {
+        if (!req.user && req.userId) {
+            const user = await User.findById(req.userId)
+            if (user) req.user = user.toAuthJSON()
+        }
+        if (!req.user) {
+            return res.status(401).json({
+                success: false,
+                message: "Authentication required",
+            })
+        }
+        if (req.user.role === ROLES.ADMIN || req.user.role === "admin") {
+            return next()
+        }
+        if (!req.user.isApproved || req.user.status === USER_STATUS.PENDING_APPROVAL) {
+            return res.status(403).json({
+                success: false,
+                isPendingApproval: true,
+                message: "Your profile is pending admin approval. You will be able to access matches and platform features once approved.",
+            })
+        }
+        if (req.user.status === USER_STATUS.DECLINED) {
+            return res.status(403).json({
+                success: false,
+                isDeclined: true,
+                message: "Your account registration has been declined by the administrator.",
+            })
+        }
+        next()
+    } catch (error) {
+        next(error)
     }
 }
 

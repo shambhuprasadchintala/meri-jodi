@@ -1,7 +1,6 @@
 import { MapPin, GraduationCap, Briefcase, X, EyeOff, MessageSquare, Clock, Heart, Star } from "lucide-react"
 import { formatMaskedSurname } from "../utils/formatters"
-import femaleProfile from "../assets/female_profile2.jpg"
-import userImage from "../assets/user.jpg"
+import defaultAvatar from "../assets/default-avatar.svg"
 
 export default function MatchCard({
     id,
@@ -22,7 +21,7 @@ export default function MatchCard({
     onViewProfile,
     onNavigateChat,
 }) {
-    const rawFallback = fallbackPhoto || userImage
+    const rawFallback = fallbackPhoto || defaultAvatar
     const displayName = formatMaskedSurname(name)
     const titleText = age ? `${displayName}, Age: ${age}` : displayName
 

@@ -1,27 +1,27 @@
 import { useNavigate } from "react-router-dom";
-import ProfileImage from "../assets/female_profile2.jpg";
+import defaultAvatar from "../assets/default-avatar.svg";
 import { ArrowRight } from "lucide-react";
 
 const Matchyoulike = () => {
   const navigate = useNavigate();
   const matches = [
     {
-      image: ProfileImage,
+      image: defaultAvatar,
       profession: "LAWYER",
       name: "Ishani D",
     },
     {
-      image: ProfileImage,
+      image: defaultAvatar,
       profession: "MANAGER",
       name: "Pratiksha Bedi",
     },
     {
-      image: ProfileImage,
+      image: defaultAvatar,
       profession: "BANKER",
       name: "Ishani Shah",
     },
     {
-      image: ProfileImage,
+      image: defaultAvatar,
       profession: "ACTRESS",
       name: "Isha Patel",
     },

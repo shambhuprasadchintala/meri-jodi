@@ -24,12 +24,13 @@ export const getUnreadCount = async () => {
   return unwrap(response)
 }
 
+// [COMMENTED OUT: AI CHAT SUGGESTIONS]
 export const getChatSuggestions = async (partnerDetails, lastMessage = "", category = "icebreaker") => {
-  const response = await axiosInstance.post("/extraction/chat-suggestions", {
-    partnerDetails,
-    lastMessage,
-    category,
-  })
-  const data = unwrap(response)
-  return data?.suggestions || data || []
+  const firstName = partnerDetails?.name ? partnerDetails.name.split(" ")[0] : "there"
+  return [
+    `Hi ${firstName}! I came across your profile and would love to connect.`,
+    `Hello ${firstName}! How is your day going?`,
+    `Namaste ${firstName}! I'd love to know more about your hobbies and interests.`,
+    `Hi ${firstName}! I liked your profile and thought we might share similar values.`,
+  ]
 }

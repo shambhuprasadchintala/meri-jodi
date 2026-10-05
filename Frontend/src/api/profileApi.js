@@ -63,20 +63,21 @@ export const getMyProfile = async () => {
   }
 }
 
+// [COMMENTED OUT: AI BIO GENERATION & CHAT SUGGESTIONS]
 export const generateAIBio = async (profileDetails) => {
-  const response = await axiosInstance.post("/extraction/generate-bio", profileDetails)
-  const data = unwrap(response)
-  return data?.bio || data
+  // AI bio generation disabled - returns standard template
+  return `Hello! I am ${profileDetails?.name || "Member"}, based in ${profileDetails?.location || "India"}. I consider myself a grounded individual with a modern outlook and respect for traditional family values.`
 }
 
 export const getChatSuggestions = async (partnerDetails, lastMessage = "", category = "icebreaker") => {
-  const response = await axiosInstance.post("/extraction/chat-suggestions", {
-    partnerDetails,
-    lastMessage,
-    category,
-  })
-  const data = unwrap(response)
-  return data?.suggestions || data || []
+  // AI chat suggestions disabled - returns static friendly conversation starters
+  const firstName = partnerDetails?.name ? partnerDetails.name.split(" ")[0] : "there"
+  return [
+    `Hi ${firstName}! I came across your profile and would love to connect.`,
+    `Hello ${firstName}! How is your day going?`,
+    `Namaste ${firstName}! I'd love to know more about your hobbies and interests.`,
+    `Hi ${firstName}! I liked your profile and thought we might share similar values.`,
+  ]
 }
 
 export const buildProfilePayload = (formData) => {

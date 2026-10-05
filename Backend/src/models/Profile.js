@@ -114,6 +114,12 @@ const profileSchema = new Schema(
         ],
         profileCompletionPct: { type: Number, default: 0 },
         isVerified: { type: Boolean, default: false },
+        isApproved: { type: Boolean, default: false },
+        approvalStatus: {
+            type: String,
+            enum: ["pending", "approved", "declined"],
+            default: "pending",
+        },
         isPhotoHidden: { type: Boolean, default: false },
         createdBy: {
             type: String,

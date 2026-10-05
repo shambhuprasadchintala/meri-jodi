@@ -51,6 +51,7 @@ router.post("/register", sanitizeBody, async (req, res) => {
             phone,
             gender,
             location,
+            res,
             reqIp,
         })
 
@@ -127,6 +128,7 @@ router.post("/login", sanitizeBody, async (req, res) => {
             email: email || req.body?.email,
             identifier: identifier || req.body?.identifier,
             password,
+            res,
             reqIp,
         })
         return apiResponse.success(result, result.message, 200)

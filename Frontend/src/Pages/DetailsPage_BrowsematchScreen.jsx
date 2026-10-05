@@ -20,8 +20,7 @@ import Navbar from "../Components/Navbar.jsx"
 import Footer from "../Components/Footer.jsx"
 import ConfirmInterestModal from "../Components/ConfirmInterestModal.jsx"
 import BlockReportModal from "../Components/BlockReportModal.jsx"
-import ProfileImage from "../assets/female_profile2.jpg"
-import userImage from "../assets/user.jpg"
+import defaultAvatar from "../assets/default-avatar.svg"
 import { getProfileById } from "../api/matchingApi"
 import { sendInterest, getSentInterests, getReceivedInterests } from "../api/interestApi"
 import { toggleShortlist, getShortlistedProfiles } from "../api/shortlistApi"
@@ -260,7 +259,7 @@ export default function DetailsPage_BrowsematchScreen() {
     const isPhotoHidden = !!profile.isPhotoHidden
     const getPhotoUrl = (p) => (typeof p === "string" ? p : p?.url)
     const primaryPhoto = profile.photos?.find((p) => typeof p === "object" && p?.isPrimary)
-    const fallbackPhoto = profile.gender === "female" ? ProfileImage : userImage
+    const fallbackPhoto = defaultAvatar
     const photoUrl =
         getPhotoUrl(primaryPhoto) ||
         getPhotoUrl(profile.photos?.[0]) ||

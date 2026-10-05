@@ -16,13 +16,29 @@ const Footer = () => {
           </div>
 
           {/* Navigation Links */}
-          <nav className="flex flex-wrap justify-center gap-x-8 gap-y-3 text-xs sm:text-sm font-normal mb-8">
+          <nav className="flex flex-wrap justify-center gap-x-8 gap-y-3 text-xs sm:text-sm font-normal mb-6">
             <a href="/#home" className="text-[#842029] hover:underline">Home</a>
             <a href="/#about" className="text-gray-600 hover:text-[#842029] transition-colors">About us</a>
             <Link to="/browse-matches" className="text-gray-600 hover:text-[#842029] transition-colors">Browse Matches</Link>
             <a href="/#stories" className="text-gray-600 hover:text-[#842029] transition-colors">Success Stories</a>
             <a href="/#faqs" className="text-gray-600 hover:text-[#842029] transition-colors">FAQs</a>
           </nav>
+
+          {/* Support Helpline */}
+          <div className="flex flex-wrap items-center justify-center gap-6 text-xs sm:text-sm text-gray-600 mb-8">
+            <div className="flex items-center gap-1.5 bg-white/80 px-4 py-2 rounded-full border border-pink-200/60 shadow-2xs">
+              <span className="text-gray-500">Customer Support:</span>
+              <a href="tel:+918446360709" className="font-bold text-[#842029] hover:underline">
+                +91 84463 60709
+              </a>
+            </div>
+            <div className="flex items-center gap-1.5 bg-white/80 px-4 py-2 rounded-full border border-pink-200/60 shadow-2xs">
+              <span className="text-gray-500">Email:</span>
+              <a href="mailto:support@merijodi.com" className="font-semibold text-gray-800 hover:underline">
+                support@merijodi.com
+              </a>
+            </div>
+          </div>
 
           {/* Social Icons */}
           <div className="flex justify-center items-center gap-5 mb-10">

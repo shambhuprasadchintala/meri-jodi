@@ -13,8 +13,7 @@ import {
 } from "lucide-react"
 import Navbar from "../Components/Navbar"
 import Footer from "../Components/Footer"
-import femaleProfile from "../assets/female_profile2.jpg"
-import userImage from "../assets/user.jpg"
+import defaultAvatar from "../assets/default-avatar.svg"
 import { getReceivedInterests, acceptInterest, declineInterest } from "../api/interestApi"
 import { formatMaskedSurname, calculateAge } from "../utils/formatters"
 
@@ -199,7 +198,7 @@ export default function InterestsReceivedDashboard() {
                                 const rawName = profile.name || profile.userId?.name || "MeriJodi Member"
                                 const maskedName = formatMaskedSurname(rawName)
                                 const age = calculateAge(profile.dateOfBirth)
-                                const fallback = profile.gender === "female" ? femaleProfile : userImage
+                                const fallback = defaultAvatar
                                 const isPhotoHidden = !!profile.isPhotoHidden
                                 const photo = isPhotoHidden ? fallback : (profile.photos?.[0]?.url || fallback)
                                 const occupation = (profile.career?.occupation || "PROFESSIONAL").toUpperCase()
@@ -368,10 +367,10 @@ export default function InterestsReceivedDashboard() {
                             </span>
                             <div className="flex items-center justify-around mt-4">
                                 {[
-                                    { name: "Kavya", img: femaleProfile },
-                                    { name: "Ishani", img: femaleProfile },
-                                    { name: "Saanvi", img: femaleProfile },
-                                    { name: "Zoya", img: femaleProfile },
+                                    { name: "Kavya", img: defaultAvatar },
+                                    { name: "Ishani", img: defaultAvatar },
+                                    { name: "Saanvi", img: defaultAvatar },
+                                    { name: "Zoya", img: defaultAvatar },
                                 ].map((person, idx) => (
                                     <div key={idx} className="flex flex-col items-center gap-1.5">
                                         <img

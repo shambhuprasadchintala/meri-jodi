@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+  <defs>
+    <linearGradient id="igAvatarBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#E4E6EB" />
+      <stop offset="100%" stop-color="#D8DADF" />
+    </linearGradient>
+  </defs>
+  <!-- Background Circle -->
+  <circle cx="100" cy="100" r="100" fill="url(#igAvatarBg)" />
+  <!-- Instagram Silhouette Avatar -->
+  <!-- Head -->
+  <circle cx="100" cy="72" r="34" fill="#9DA2AB" />
+  <!-- Body / Shoulders (Clipped inside circle) -->
+  <path d="M 32 178 C 36 128 62 118 100 118 C 138 118 164 128 168 178 C 149 192 125 200 100 200 C 75 200 51 192 32 178 Z" fill="#9DA2AB" />
+</svg>

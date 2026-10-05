@@ -21,7 +21,9 @@ export const USER_STATUS = {
     ACTIVE: "active",
     INACTIVE: "inactive",
     BANNED: "banned",
+    PENDING_APPROVAL: "pending_approval",
     PENDING_VERIFICATION: "pending_verification",
+    DECLINED: "declined",
 }
 
 export const GENDER = {
