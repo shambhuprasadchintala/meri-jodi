@@ -7,7 +7,7 @@ const SuccessStories = () => {
     {
       id: 1,
       img: SuccessStories1,
-      quote: "“MeriJodi helped us find each other within a few weeks. The AI recommendations were surprisingly accurate, and today we are happily married.”",
+      quote: "“MeriJodi helped us find each other within a few weeks. The personalized match recommendations were so accurate, and today we are happily married.”",
       names: "Mr. & Mrs. Bedi",
       location: "Mumbai"
     },
@@ -63,7 +63,7 @@ const SuccessStories = () => {
     {
       id: 9,
       img: img4,
-      quote: "“From chatting on the app to walking down the aisle, our journey was seamless. AI features saved us so much time.”",
+      quote: "“From chatting on the app to walking down the aisle, our journey was seamless. Verified matching saved us so much time.”",
       names: "Priya & Amit",
       location: "Hyderabad"
     },

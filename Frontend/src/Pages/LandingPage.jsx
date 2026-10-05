@@ -2,7 +2,8 @@ import { Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import Navbar from "../Components/Navbar";
 import Banner from "../Components/Banner";
-import AIMatchmaking from "../Components/AIMatchmaking";
+// [COMMENTED OUT: AI MATCHMAKING COMPONENT]
+// import AIMatchmaking from "../Components/AIMatchmaking";
 import WhyChooseUs from "../Components/Whychooseus";
 import SuccessStories from "../Components/SuccessStories";
 import FQA from "../Components/FQA";
@@ -31,7 +32,8 @@ const LandingPage = () => {
       <div className="LandingPage">
         <Navbar />
         <Banner />
-        <AIMatchmaking />
+        {/* [COMMENTED OUT: AI MATCHMAKING SECTION] */}
+        {/* <AIMatchmaking /> */}
         <WhyChooseUs />
         <SuccessStories />
         <FQA />

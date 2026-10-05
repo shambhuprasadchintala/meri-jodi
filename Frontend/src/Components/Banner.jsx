@@ -28,13 +28,13 @@ const Banner = () => {
           <div className="w-full lg:max-w-[550px] text-white text-center lg:text-left">
             <span className="inline-flex items-center px-4 py-1.5 sm:py-2 rounded-full bg-[#842029] outline-[#D8465C] outline-2 text-xs sm:text-sm">
               <img src={star} alt="Star" className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-              AI-Powered Matchmaking
+              100% Verified Matchmaking
             </span>
             <h1 className="mt-4 sm:mt-6 text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-serif leading-tight">
               Find Your <br className="hidden sm:inline" /> Perfect Match
             </h1>
             <p className="mt-3 sm:mt-4 text-sm sm:text-base lg:text-lg text-gray-100">
-              Discover Genuine Matches With AI-Powered Compatibility.
+              Discover Genuine Matches With Verified Compatibility & Trust.
             </p>
             <div className="hidden lg:flex gap-2 mt-10">
               <span className="w-2 h-2 rounded-full bg-white"></span>
@@ -83,8 +83,7 @@ const Banner = () => {
               ==============================================================================
               */}
 
-              {error && <p className="text-xs text-red-500">{error}</p>}
-              <p className="text-xs text-gray-500">A verification link will be sent to your email</p>
+              <p className="text-xs text-gray-500">Fast, direct registration with verified security</p>
               <button
                 type="button"
                 onClick={handleRegister}

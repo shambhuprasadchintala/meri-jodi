@@ -1021,14 +1021,15 @@ export default function AdminApp() {
       <main className="admin-main">
         {/* Top Header */}
         <header className="admin-header">
-          <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", minWidth: 0 }}>
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              style={{ display: "inline-flex", background: "none", border: "none", cursor: "pointer", padding: "0.5rem" }}
+              style={{ display: "inline-flex", background: "none", border: "none", cursor: "pointer", padding: "0.4rem", flexShrink: 0 }}
+              aria-label="Toggle navigation menu"
             >
               <Menu size={22} />
             </button>
-            <h1 style={{ fontSize: "1.125rem", fontWeight: "700", color: "#1F2937" }}>
+            <h1 className="admin-header-title">
               {currentTab === "overview" && "Dashboard Overview & Platform KPIs"}
               {currentTab === "confirmation" && "Admin: Confirmation"}
               {currentTab === "users" && "User Directory & Moderation"}
@@ -1039,7 +1040,7 @@ export default function AdminApp() {
             </h1>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexShrink: 0 }}>
             <button
               onClick={refreshAll}
               title="Refresh Data"
@@ -1048,7 +1049,7 @@ export default function AdminApp() {
             >
               <RefreshCw size={14} className={loadingData || confirmationLoading ? "animate-spin" : ""} /> Refresh
             </button>
-            <span className="badge badge-approved">System Operational</span>
+            <span className="badge badge-approved admin-header-status-badge">System Operational</span>
           </div>
         </header>
 
@@ -1192,76 +1193,144 @@ export default function AdminApp() {
                   </div>
                 ) : (
                   <>
-                    <table className="confirm-table">
-                      <thead>
-                        <tr>
-                          <th>Name</th>
-                          <th>Age</th>
-                          <th>Gender</th>
-                          <th>Location</th>
-                          <th>Requested on</th>
-                          <th style={{ textAlign: "right", paddingRight: "2rem" }}>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {confirmations.map((user) => (
-                          <tr key={user._id || user.userId}>
-                            <td>
-                              <div className="confirm-user-info">
-                                <img
-                                  src={user.avatar || getDefaultAvatar()}
-                                  alt={user.name}
-                                  className="confirm-avatar"
-                                  onError={(e) => { e.currentTarget.src = getDefaultAvatar() }}
-                                />
-                                <div>
-                                  <p className="confirm-name">{user.name || "Member"}</p>
-                                  <p className="confirm-sub">{user.phone || user.email || ""}</p>
-                                </div>
-                              </div>
-                            </td>
-                            <td style={{ fontWeight: "600", color: "#4B5563" }}>
-                              {user.age && user.age !== "—" ? user.age : "24"}
-                            </td>
-                            <td style={{ fontWeight: "500" }}>
-                              {user.gender || "—"}
-                            </td>
-                            <td style={{ color: "#4B5563" }}>
-                              {user.location || "Mumbai"}
-                            </td>
-                            <td style={{ color: "#6B7280", fontSize: "0.8125rem" }}>
-                              {user.requestedOn || "Dec 14, 2025"}
-                            </td>
-                            <td>
-                              <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "0.65rem", paddingRight: "0.75rem" }}>
-                                {user.approvalStatus === "approved" ? (
-                                  <span className="badge badge-approved">Approved</span>
-                                ) : user.approvalStatus === "declined" ? (
-                                  <span className="badge badge-rejected">Declined</span>
-                                ) : (
-                                  <>
-                                    <button
-                                      onClick={() => handleAcceptUser(user)}
-                                      className="btn-confirm-accept"
-                                      title="Accept and approve this user"
-                                    >
-                                      Accept <Check size={14} strokeWidth={3} />
-                                    </button>
-                                    <button
-                                      onClick={() => handleDeclineUser(user)}
-                                      className="btn-confirm-decline"
-                                      title="Decline this user"
-                                    >
-                                      Decline <X size={14} strokeWidth={2.5} />
-                                    </button>
-                                  </>
-                                )}
-                              </div>
-                            </td>
+                    {/* Desktop / Tablet Table View */}
+                    <div className="confirm-table-scroll-wrapper">
+                      <table className="confirm-table">
+                        <thead>
+                          <tr>
+                            <th>User Details</th>
+                            <th>Age</th>
+                            <th>Gender</th>
+                            <th>Location</th>
+                            <th>Requested On</th>
+                            <th style={{ textAlign: "right", paddingRight: "1.5rem" }}>Actions</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {confirmations.map((user) => (
+                            <tr key={user._id || user.userId}>
+                              <td>
+                                <div className="confirm-user-info">
+                                  <img
+                                    src={user.avatar || getDefaultAvatar()}
+                                    alt={user.name}
+                                    className="confirm-avatar"
+                                    onError={(e) => { e.currentTarget.src = getDefaultAvatar() }}
+                                  />
+                                  <div className="confirm-user-text">
+                                    <p className="confirm-name" title={user.name}>{user.name || "Member"}</p>
+                                    <p className="confirm-sub" title={user.phone || user.email}>{user.phone || user.email || ""}</p>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="confirm-cell-nowrap" style={{ fontWeight: "600", color: "#4B5563" }}>
+                                {user.age && user.age !== "—" ? `${user.age} yrs` : "—"}
+                              </td>
+                              <td className="confirm-cell-nowrap" style={{ fontWeight: "500" }}>
+                                {user.gender || "—"}
+                              </td>
+                              <td className="confirm-cell-truncate" title={user.location || ""}>
+                                {user.location || "—"}
+                              </td>
+                              <td className="confirm-cell-nowrap" style={{ color: "#6B7280", fontSize: "0.8125rem" }}>
+                                {user.requestedOn || "Recent"}
+                              </td>
+                              <td>
+                                <div className="confirm-actions-wrapper">
+                                  {user.approvalStatus === "approved" ? (
+                                    <span className="badge badge-approved">Approved</span>
+                                  ) : user.approvalStatus === "declined" ? (
+                                    <span className="badge badge-rejected">Declined</span>
+                                  ) : (
+                                    <>
+                                      <button
+                                        onClick={() => handleAcceptUser(user)}
+                                        className="btn-confirm-accept"
+                                        title="Accept and approve this user"
+                                      >
+                                        Accept <Check size={14} strokeWidth={3} />
+                                      </button>
+                                      <button
+                                        onClick={() => handleDeclineUser(user)}
+                                        className="btn-confirm-decline"
+                                        title="Decline this user"
+                                      >
+                                        Decline <X size={14} strokeWidth={2.5} />
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Mobile Card List View */}
+                    <div className="confirm-mobile-card-list">
+                      {confirmations.map((user) => (
+                        <div key={`mob-${user._id || user.userId}`} className="confirm-mobile-card">
+                          <div className="confirm-mobile-card-header">
+                            <div className="confirm-user-info">
+                              <img
+                                src={user.avatar || getDefaultAvatar()}
+                                alt={user.name}
+                                className="confirm-avatar"
+                                onError={(e) => { e.currentTarget.src = getDefaultAvatar() }}
+                              />
+                              <div className="confirm-user-text">
+                                <p className="confirm-name">{user.name || "Member"}</p>
+                                <p className="confirm-sub">{user.phone || user.email || ""}</p>
+                              </div>
+                            </div>
+                            <div>
+                              {user.approvalStatus === "approved" ? (
+                                <span className="badge badge-approved">Approved</span>
+                              ) : user.approvalStatus === "declined" ? (
+                                <span className="badge badge-rejected">Declined</span>
+                              ) : (
+                                <span className="badge badge-pending">Pending</span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="confirm-mobile-details-grid">
+                            <div className="confirm-mobile-detail-item">
+                              <span className="confirm-mobile-detail-label">Age / Gender</span>
+                              <span className="confirm-mobile-detail-val">
+                                {user.age && user.age !== "—" ? `${user.age} yrs` : "—"} • {user.gender || "—"}
+                              </span>
+                            </div>
+                            <div className="confirm-mobile-detail-item">
+                              <span className="confirm-mobile-detail-label">Location</span>
+                              <span className="confirm-mobile-detail-val">{user.location || "—"}</span>
+                            </div>
+                            <div className="confirm-mobile-detail-item" style={{ gridColumn: "span 2" }}>
+                              <span className="confirm-mobile-detail-label">Requested On</span>
+                              <span className="confirm-mobile-detail-val">{user.requestedOn || "Recent"}</span>
+                            </div>
+                          </div>
+
+                          {(!user.approvalStatus || user.approvalStatus === "pending") && (
+                            <div className="confirm-mobile-actions">
+                              <button
+                                onClick={() => handleAcceptUser(user)}
+                                className="btn-confirm-accept confirm-mobile-btn"
+                              >
+                                Accept & Approve <Check size={14} strokeWidth={3} />
+                              </button>
+                              <button
+                                onClick={() => handleDeclineUser(user)}
+                                className="btn-confirm-decline confirm-mobile-btn"
+                              >
+                                Decline <X size={14} strokeWidth={2.5} />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
 
                     {/* Pagination */}
                     <div className="confirm-pagination">

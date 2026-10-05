@@ -23,7 +23,7 @@ const Whychooseus = () => {
           </h2>
           
           <p className="text-gray-500 text-sm sm:text-base leading-relaxed mb-6">
-            At <span className="font-semibold text-gray-800">MeriJodi.com</span>, we combine traditional values with modern technology to help people find genuine life partners. Our <span className="font-semibold text-gray-800">AI-powered matchmaking system</span> understands preferences, lifestyle choices, personality traits, and relationship goals to suggest highly compatible matches.
+            At <span className="font-semibold text-gray-800">MeriJodi.com</span>, we combine traditional values with modern security to help people find genuine life partners. Our <span className="font-semibold text-gray-800">verified matchmaking platform</span> understands preferences, lifestyle choices, family values, and relationship goals to suggest highly compatible matches.
           </p>
           
           <p className="text-gray-500 text-sm sm:text-base leading-relaxed">

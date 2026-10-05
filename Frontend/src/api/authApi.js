@@ -123,7 +123,7 @@ export const resendLoginOtp = async (phoneOrEmail) => {
 /**
  * Google OAuth Login & Registration
  */
-export const googleAuth = async ({ idToken, credential, accessToken, email, name, googleId, avatar }) => {
+export const googleAuth = async ({ idToken, credential, accessToken, email, name, googleId, avatar, phone }) => {
     const res = await authApi.post("/google", {
         idToken,
         credential,
@@ -132,6 +132,7 @@ export const googleAuth = async ({ idToken, credential, accessToken, email, name
         name,
         googleId,
         avatar,
+        phone,
     })
     return unwrap(res)
 }

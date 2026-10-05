@@ -1,25 +1,29 @@
 import { z } from "zod"
 
 export const registerSchema = z.object({
-    name: z.string().min(2, "Name must be at least 2 characters long").trim(),
+    name: z.string({ required_error: "Full name is required" }).min(2, "Name must be at least 2 characters long").trim(),
+    email: z
+        .string({ required_error: "Email address is required" })
+        .email("Please enter a valid email address")
+        .toLowerCase()
+        .trim(),
     phone: z
-        .string({ required_error: "Phone number is required" })
+        .string({ required_error: "Mobile phone number is required" })
         .trim()
         .min(10, "Phone number must be at least 10 digits")
         .max(16, "Phone number is too long"),
-    password: z.string().min(6, "Password must be at least 6 characters long"),
-    email: z.string().email("Invalid email format").toLowerCase().trim().optional().or(z.literal("")),
+    password: z.string({ required_error: "Password is required" }).min(6, "Password must be at least 6 characters long"),
     gender: z.string().optional(),
     location: z.string().optional(),
 })
 
 export const loginSchema = z.object({
+    email: z.string().email("Invalid email format").toLowerCase().trim().optional(),
     phone: z.string().optional(),
-    email: z.string().optional(),
     identifier: z.string().optional(),
-    password: z.string().min(1, "Password is required"),
-}).refine((data) => data.phone || data.email || data.identifier, {
-    message: "Phone number or email is required",
+    password: z.string({ required_error: "Password is required" }).min(1, "Password is required"),
+}).refine((data) => data.email || data.phone || data.identifier, {
+    message: "Email address is required",
 })
 
 export const verifyOtpSchema = z.object({
@@ -41,4 +45,6 @@ export const googleAuthSchema = z.object({
     name: z.string().optional(),
     googleId: z.string().optional(),
     avatar: z.string().optional(),
+    phone: z.string().optional(),
 })
+

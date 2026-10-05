@@ -1,8 +1,9 @@
 import { useState } from "react"
 import { useNavigate, useLocation, Link } from "react-router-dom"
-import { Eye, EyeOff, ShieldCheck, Heart } from "lucide-react"
+import { Eye, EyeOff, ShieldCheck, Mail, Lock, User, Phone, MapPin } from "lucide-react"
 import { registerUser, googleAuth } from "../api/authApi"
 import { useAuth } from "../context/AuthContext"
+import GooglePhoneModal from "../Components/GooglePhoneModal"
 import logo from "../assets/logo2.png"
 
 import { useGoogleLogin } from "@react-oauth/google"
@@ -10,52 +11,60 @@ import { useGoogleLogin } from "@react-oauth/google"
 const SignUpPage = () => {
     const navigate = useNavigate()
     const location = useLocation()
-    const { signIn } = useAuth()
+    const { signIn, updateUser } = useAuth()
 
     const [name, setName] = useState(location.state?.name || "")
     const [email, setEmail] = useState(location.state?.email || "")
+    const [phone, setPhone] = useState("")
     const [password, setPassword] = useState("")
     const [showPassword, setShowPassword] = useState(false)
     const [gender, setGender] = useState(location.state?.gender ? String(location.state.gender).toLowerCase() : "female")
     const [locationCity, setLocationCity] = useState(location.state?.city || location.state?.location || "")
-    const [phone, setPhone] = useState("")
     const [error, setError] = useState("")
     const [loading, setLoading] = useState(false)
+
+    // Google Phone Capture Modal State
+    const [showPhoneModal, setShowPhoneModal] = useState(false)
+    const [pendingGoogleData, setPendingGoogleData] = useState(null)
 
     // Direct registration without SMS OTP
     const handleSubmit = async (e) => {
         if (e?.preventDefault) e.preventDefault()
         setError("")
 
-        if (!name.trim() || !password || !phone.trim()) {
-            setError("Please fill in your name, mobile number, and password.")
+        if (!name.trim()) {
+            setError("Please enter your full name.")
+            return
+        }
+
+        const cleanEmail = email.trim().toLowerCase()
+        if (!cleanEmail || !cleanEmail.includes("@")) {
+            setError("Please enter a valid email address.")
             return
         }
 
         const cleanPhone = phone.trim().replace(/\D/g, "")
-        if (cleanPhone.length < 10) {
-            setError("Please enter a valid 10-digit mobile number.")
+        if (cleanPhone.length !== 10) {
+            setError("Please enter a valid 10-digit mobile phone number.")
             return
         }
 
-        if (password.length < 6) {
+        if (!password || password.length < 6) {
             setError("Password must be at least 6 characters long.")
             return
         }
 
         setLoading(true)
         try {
-            const formattedPhone = cleanPhone.startsWith("91") && cleanPhone.length === 12
-                ? `+${cleanPhone}`
-                : `+91${cleanPhone}`
+            const formattedPhone = `+91${cleanPhone}`
 
             const data = await registerUser({
                 name: name.trim(),
-                email: email.trim() || undefined,
+                email: cleanEmail,
                 password,
+                phone: formattedPhone,
                 gender,
                 location: locationCity.trim() || undefined,
-                phone: formattedPhone,
             })
 
             // Clear draft keys from local storage
@@ -79,17 +88,6 @@ const SignUpPage = () => {
         }
     }
 
-    /*
-    // ==========================================
-    // [COMMENTED OUT: TWILIO SMS OTP REGISTRATION VERIFICATION]
-    // OTP verification has been removed in favor of direct registration with admin approval.
-    const handleOtpVerify = async (e) => {
-        if (e?.preventDefault) e.preventDefault()
-        // ...
-    }
-    // ==========================================
-    */
-
     const googleRegisterHook = useGoogleLogin({
         onSuccess: async (tokenResponse) => {
             setLoading(true)
@@ -98,19 +96,29 @@ const SignUpPage = () => {
                 const data = await googleAuth({
                     accessToken: tokenResponse.access_token,
                 })
+
                 try {
                     localStorage.removeItem("merijodi_draft_profile")
                     localStorage.removeItem("merijodi_draft_step")
                     localStorage.removeItem("merijodi_draft_userId")
                 } catch (_) {}
+
                 signIn(data.token || data.accessToken, data.user)
-                if (data.isNewUser || !data.isProfileComplete) {
-                    navigate("/complete-profile")
+
+                // If Google user has no phone number, prompt for mandatory phone capture
+                const userPhone = data.user?.phone
+                if (data.needsPhone || !userPhone || String(userPhone).trim().length < 10) {
+                    setPendingGoogleData(data)
+                    setShowPhoneModal(true)
                 } else {
-                    navigate("/home")
+                    if (data.isNewUser || !data.isProfileComplete) {
+                        navigate("/complete-profile")
+                    } else {
+                        navigate("/home")
+                    }
                 }
             } catch (err) {
-                setError(err.response?.data?.message || "Google registration failed.")
+                setError(err.response?.data?.message || "Google registration failed. Please try again.")
             } finally {
                 setLoading(false)
             }
@@ -129,6 +137,12 @@ const SignUpPage = () => {
         googleRegisterHook()
     }
 
+    const handleGooglePhoneSuccess = (updatedUser) => {
+        setShowPhoneModal(false)
+        updateUser(updatedUser)
+        navigate("/complete-profile")
+    }
+
     return (
         <div className="min-h-screen w-full flex bg-[#FAF8F5]">
             {/* Left Brand Banner */}
@@ -144,11 +158,11 @@ const SignUpPage = () => {
                         Begin Your Search for a Soulmate.
                     </h2>
                     <p className="text-[#6B7280] text-base leading-relaxed">
-                        Create your profile in minutes and find compatible life partners across India.
+                        Create your profile with email and mobile verification to find compatible life partners across India.
                     </p>
                 </div>
                 <div className="text-xs text-[#9CA3AF]">
-                    © {new Date().getFullYear()} MeriJodi. All rights reserved.
+                    © {new Date().getFullYear()} MeriJodi. All rights reserved. • Support: +91 84463 60709
                 </div>
             </div>
 
@@ -176,24 +190,49 @@ const SignUpPage = () => {
                             </div>
                         )}
 
-                        <form onSubmit={handleSubmit} className="space-y-4">
+                        <form onSubmit={handleSubmit} className="space-y-3.5">
                             <div>
                                 <label className="block text-xs font-semibold text-gray-700 mb-1 uppercase tracking-wider">
                                     Full Name *
                                 </label>
-                                <input
-                                    type="text"
-                                    placeholder="e.g. Priya Sharma"
-                                    value={name}
-                                    onChange={(e) => setName(e.target.value)}
-                                    className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm focus:border-[#ED5463] focus:ring-2 focus:ring-[#ED5463]/20 focus:outline-none transition-all"
-                                    required
-                                />
+                                <div className="relative">
+                                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                                        <User className="w-4 h-4" />
+                                    </div>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. Priya Sharma"
+                                        value={name}
+                                        onChange={(e) => setName(e.target.value)}
+                                        className="w-full rounded-xl border border-gray-300 pl-10 pr-4 py-2.5 text-sm focus:border-[#ED5463] focus:ring-2 focus:ring-[#ED5463]/20 focus:outline-none transition-all"
+                                        required
+                                        autoFocus
+                                    />
+                                </div>
                             </div>
 
                             <div>
                                 <label className="block text-xs font-semibold text-gray-700 mb-1 uppercase tracking-wider">
-                                    Mobile Number * (Required)
+                                    Email Address * (For Login & Security)
+                                </label>
+                                <div className="relative">
+                                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                                        <Mail className="w-4 h-4" />
+                                    </div>
+                                    <input
+                                        type="email"
+                                        placeholder="you@example.com"
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        className="w-full rounded-xl border border-gray-300 pl-10 pr-4 py-2.5 text-sm focus:border-[#ED5463] focus:ring-2 focus:ring-[#ED5463]/20 focus:outline-none transition-all"
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-700 mb-1 uppercase tracking-wider">
+                                    Mobile Phone Number * (Required)
                                 </label>
                                 <div className="relative">
                                     <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400 text-sm font-medium">
@@ -206,7 +245,7 @@ const SignUpPage = () => {
                                         onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
                                         maxLength={10}
                                         required
-                                        className="w-full rounded-xl border border-gray-300 pl-12 pr-4 py-2.5 text-sm focus:border-[#ED5463] focus:ring-2 focus:ring-[#ED5463]/20 focus:outline-none transition-all"
+                                        className="w-full rounded-xl border border-gray-300 pl-12 pr-4 py-2.5 text-sm font-medium focus:border-[#ED5463] focus:ring-2 focus:ring-[#ED5463]/20 focus:outline-none transition-all"
                                     />
                                 </div>
                             </div>
@@ -219,7 +258,7 @@ const SignUpPage = () => {
                                     <select
                                         value={gender}
                                         onChange={(e) => setGender(e.target.value)}
-                                        className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm focus:border-[#ED5463] focus:ring-2 focus:ring-[#ED5463]/20 focus:outline-none transition-all bg-white"
+                                        className="w-full rounded-xl border border-gray-300 px-3.5 py-2.5 text-sm focus:border-[#ED5463] focus:ring-2 focus:ring-[#ED5463]/20 focus:outline-none transition-all bg-white"
                                     >
                                         <option value="male">Bridegroom (Male)</option>
                                         <option value="female">Bride (Female)</option>
@@ -229,42 +268,37 @@ const SignUpPage = () => {
 
                                 <div>
                                     <label className="block text-xs font-semibold text-gray-700 mb-1 uppercase tracking-wider">
-                                        Current City / Location
+                                        City / Location
                                     </label>
-                                    <input
-                                        type="text"
-                                        placeholder="e.g. Mumbai, Delhi, Bengaluru"
-                                        value={locationCity}
-                                        onChange={(e) => setLocationCity(e.target.value)}
-                                        className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm focus:border-[#ED5463] focus:ring-2 focus:ring-[#ED5463]/20 focus:outline-none transition-all"
-                                    />
+                                    <div className="relative">
+                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                                            <MapPin className="w-3.5 h-3.5" />
+                                        </div>
+                                        <input
+                                            type="text"
+                                            placeholder="e.g. Mumbai, Pune"
+                                            value={locationCity}
+                                            onChange={(e) => setLocationCity(e.target.value)}
+                                            className="w-full rounded-xl border border-gray-300 pl-8 pr-3 py-2.5 text-sm focus:border-[#ED5463] focus:ring-2 focus:ring-[#ED5463]/20 focus:outline-none transition-all"
+                                        />
+                                    </div>
                                 </div>
                             </div>
 
                             <div>
                                 <label className="block text-xs font-semibold text-gray-700 mb-1 uppercase tracking-wider">
-                                    Email Address (Optional)
-                                </label>
-                                <input
-                                    type="email"
-                                    placeholder="you@example.com (optional)"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm focus:border-[#ED5463] focus:ring-2 focus:ring-[#ED5463]/20 focus:outline-none transition-all"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-semibold text-gray-700 mb-1 uppercase tracking-wider">
-                                    Create Password *
+                                    Create Password * (Min 6 Characters)
                                 </label>
                                 <div className="relative">
+                                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                                        <Lock className="w-4 h-4" />
+                                    </div>
                                     <input
                                         type={showPassword ? "text" : "password"}
                                         placeholder="Minimum 6 characters"
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
-                                        className="w-full rounded-xl border border-gray-300 px-4 py-2.5 pr-11 text-sm focus:border-[#ED5463] focus:ring-2 focus:ring-[#ED5463]/20 focus:outline-none transition-all"
+                                        className="w-full rounded-xl border border-gray-300 pl-10 pr-11 py-2.5 text-sm focus:border-[#ED5463] focus:ring-2 focus:ring-[#ED5463]/20 focus:outline-none transition-all"
                                         required
                                     />
                                     <button
@@ -289,7 +323,7 @@ const SignUpPage = () => {
                         </form>
 
                         {/* Google Sign-Up */}
-                        <div className="relative my-5">
+                        <div className="relative my-4">
                             <div className="absolute inset-0 flex items-center">
                                 <div className="w-full border-t border-gray-200"></div>
                             </div>
@@ -334,6 +368,14 @@ const SignUpPage = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Mandatory Google Mobile Phone Number Capture Modal */}
+            <GooglePhoneModal
+                isOpen={showPhoneModal}
+                user={pendingGoogleData?.user}
+                onSuccess={handleGooglePhoneSuccess}
+                onCancel={() => setShowPhoneModal(false)}
+            />
         </div>
     )
 }

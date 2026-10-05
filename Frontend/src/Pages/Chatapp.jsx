@@ -6,6 +6,7 @@ import Navbar from '../Components/Navbar'
 import { getConversations, getConversationHistory, getChatSuggestions } from '../api/messageApi'
 import { getProfileById } from '../api/matchingApi'
 import { getMyProfile } from '../api/profileApi'
+import defaultAvatar from '../assets/default-avatar.svg'
 import { formatMaskedSurname } from '../utils/formatters'
 import { SOCKET_URL } from '../api/apiConfig'
 
@@ -293,13 +294,7 @@ export default function Chatapp() {
                         <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-[#842029]" />
                       )}
                       <div className="w-11 h-11 rounded-full overflow-hidden shrink-0 border border-gray-200 bg-[#FFF0F2] flex items-center justify-center">
-                        {partnerPhoto ? (
-                          <img src={partnerPhoto} alt={partnerName} className="w-full h-full object-cover" />
-                        ) : (
-                          <span className="font-serif font-bold text-sm text-[#842029]">
-                            {partnerName.charAt(0).toUpperCase()}
-                          </span>
-                        )}
+                        <img src={partnerPhoto || defaultAvatar} alt={partnerName} className="w-full h-full object-cover" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex justify-between items-baseline mb-0.5">
@@ -364,13 +359,7 @@ export default function Chatapp() {
                       onClick={() => navigate(`/match-details/${activeChat}`)}
                       className="w-10 h-10 rounded-full overflow-hidden bg-[#FFF0F2] shrink-0 border border-gray-200 flex items-center justify-center cursor-pointer hover:opacity-90"
                     >
-                      {getChatPartnerPhoto() ? (
-                        <img src={getChatPartnerPhoto()} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <span className="font-serif font-bold text-sm text-[#842029]">
-                          {getChatPartnerName().charAt(0).toUpperCase()}
-                        </span>
-                      )}
+                      <img src={getChatPartnerPhoto() || defaultAvatar} alt="" className="w-full h-full object-cover" />
                     </div>
                     <div className="min-w-0 cursor-pointer" onClick={() => navigate(`/match-details/${activeChat}`)}>
                       <div className="flex items-center gap-1.5">
@@ -442,12 +431,12 @@ export default function Chatapp() {
                   )}
                 </div>
 
-                {/* AI Icebreaker Suggestions Bar */}
+                {/* Quick Icebreaker Suggestions Bar */}
                 <div className="px-3 sm:px-4 py-2 border-t border-rose-100 bg-[#FFF9FA]">
                   <div className="flex items-center justify-between gap-2 mb-1.5">
                     <div className="flex items-center gap-1.5 text-xs font-semibold text-[#842029]">
                       <Sparkles size={14} className="text-[#ED5463]" />
-                      <span>AI Conversation Starters</span>
+                      <span>Quick Conversation Starters</span>
                     </div>
                     <button
                       type="button"
@@ -455,12 +444,12 @@ export default function Chatapp() {
                       disabled={loadingSuggestions}
                       className="text-[11px] text-[#842029] hover:underline font-medium flex items-center gap-1 cursor-pointer disabled:opacity-50"
                     >
-                      {loadingSuggestions ? 'Generating...' : suggestions.length > 0 ? '↻ Refresh AI' : '✨ Get AI Suggestions'}
+                      {loadingSuggestions ? 'Loading...' : suggestions.length > 0 ? '↻ Refresh' : '💬 Quick Starters'}
                     </button>
                   </div>
                   {loadingSuggestions ? (
                     <div className="flex items-center gap-2 py-1 text-xs text-gray-400">
-                      <span className="animate-spin text-xs">✨</span> Generating personalized suggestions...
+                      <span className="text-xs">💬</span> Loading greeting suggestions...
                     </div>
                   ) : suggestions.length > 0 ? (
                     <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
@@ -481,7 +470,7 @@ export default function Chatapp() {
                     </div>
                   ) : (
                     <p className="text-[11px] text-gray-400">
-                      Click <strong className="text-[#842029] cursor-pointer hover:underline" onClick={fetchSuggestions}>"Get AI Suggestions"</strong> to generate context-aware openers based on {getChatPartnerName()}'s profile.
+                      Click <strong className="text-[#842029] cursor-pointer hover:underline" onClick={fetchSuggestions}>"Quick Starters"</strong> to view friendly openers for {getChatPartnerName()}.
                     </p>
                   )}
                 </div>

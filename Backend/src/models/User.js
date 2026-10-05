@@ -64,9 +64,10 @@ userSchema.methods.validatePassword = async function (password) {
 }
 
 userSchema.methods.toAuthJSON = function () {
+    const idStr = this._id ? this._id.toString() : ""
     return {
-        _id: this._id,
-        id: this._id,
+        _id: idStr,
+        id: idStr,
         name: this.name,
         email: this.email,
         phone: this.phone,

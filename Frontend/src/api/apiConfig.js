@@ -1,4 +1,4 @@
-const DEFAULT_API_URL = "http://localhost:5000"
+const DEFAULT_API_URL = "http://localhost:5001"
 
 // Accept a server origin or an existing API base without duplicating route prefixes.
 export const resolveApiUrls = (configuredUrl) => {

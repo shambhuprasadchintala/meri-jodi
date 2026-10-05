@@ -215,7 +215,7 @@ router.post("/google", sanitizeBody, async (req, res) => {
             return apiResponse.error(errorDetails.message, 400)
         }
 
-        const { idToken, credential, accessToken, email, name, googleId, avatar } = validation.data
+        const { idToken, credential, accessToken, email, name, googleId, avatar, phone } = validation.data
         const result = await authService.googleAuth({
             idToken,
             credential,
@@ -224,6 +224,7 @@ router.post("/google", sanitizeBody, async (req, res) => {
             name,
             googleId,
             avatar,
+            phone: phone || req.body?.phone || req.body?.mobile,
             res,
         })
 
@@ -365,6 +366,22 @@ router.put("/profile", authenticate, sanitizeBody, handleUpdateProfile)
  * Update phone number for authenticated user.
  */
 router.put("/phone", authenticate, sanitizeBody, async (req, res) => {
+    const apiResponse = new ApiResponse(res)
+    try {
+        const { phone } = req.body
+        if (!phone) return apiResponse.error("Phone number is required", 400)
+
+        const result = await authService.updateUserPhone({
+            userId: req.userId,
+            phone,
+        })
+        return apiResponse.success(result, result.message, 200)
+    } catch (error) {
+        return apiResponse.error(error.message, error.statusCode || 400)
+    }
+})
+
+router.post("/phone", authenticate, sanitizeBody, async (req, res) => {
     const apiResponse = new ApiResponse(res)
     try {
         const { phone } = req.body

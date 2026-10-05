@@ -32,72 +32,22 @@
 //     return null
 // }
 
+/*
+// [COMMENTED OUT: GEMINI AI HELPER & SCHEMA]
 async function generateWithGemini(contents, config = {}) {
-    const ai = getAI()
-    if (!ai) return null
-    for (const model of GEMINI_MODELS) {
-        try {
-            const req = { model, contents }
-            if (config && Object.keys(config).length > 0) req.config = config
-            const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error(`Timeout after 6000ms for ${model}`)), 6000)
-            )
-            const response = await Promise.race([ai.models.generateContent(req), timeoutPromise])
-            if (response?.text) return response.text.trim()
-        } catch (err) {
-            console.warn(`[Gemini] Model ${model} failed, trying next:`, err.message || err)
-        }
-    }
     return null
 }
 
 const biodataSchema = {
-    type: Type.OBJECT,
+    type: "OBJECT",
     properties: {
         personal_details: {
-            type: Type.OBJECT,
-            properties: {
-                name: { type: Type.STRING },
-                gender: { type: Type.STRING },
-                date_of_birth: { type: Type.STRING },
-                place_of_birth: { type: Type.STRING },
-                time_of_birth: { type: Type.STRING },
-                rashi: { type: Type.STRING },
-                nakshatra: { type: Type.STRING },
-                height: { type: Type.STRING },
-                marital_status: { type: Type.STRING },
-                manglik: { type: Type.STRING },
-                complexion: { type: Type.STRING },
-                highest_education: { type: Type.STRING },
-                organization_name: { type: Type.STRING },
-                annual_income: { type: Type.STRING },
-                about_me: { type: Type.STRING },
-                mother_tongue: { type: Type.STRING },
-                religion: { type: Type.STRING },
-                caste: { type: Type.STRING },
-                gotra: { type: Type.STRING },
-                hobbies: { type: Type.ARRAY, items: { type: Type.STRING } },
-            },
-        },
-        family_details: {
-            type: Type.OBJECT,
-            properties: {
-                fathers_name: { type: Type.STRING },
-                fathers_occupation: { type: Type.STRING },
-                mothers_name: { type: Type.STRING },
-                mothers_occupation: { type: Type.STRING },
-            },
-        },
-        contact_details: {
-            type: Type.OBJECT,
-            properties: {
-                contact_number: { type: Type.STRING },
-                email_id: { type: Type.STRING },
-                city: { type: Type.STRING },
-            },
-        },
-    },
+            type: "OBJECT",
+        }
+    }
 }
+*/
+
 
 /**
  * Convert any height format (e.g. 5'11", 5' 11", 5’11”, 5 ft 11 in, 180 cm) to standard format (e.g. 5'11")

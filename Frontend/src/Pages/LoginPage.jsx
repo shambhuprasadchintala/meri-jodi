@@ -1,25 +1,30 @@
 import { useState, useEffect } from "react"
 import { useNavigate, Link } from "react-router-dom"
-import { Eye, EyeOff, ShieldCheck } from "lucide-react"
+import { Eye, EyeOff, ShieldCheck, Mail, Lock, Phone } from "lucide-react"
 import { useAuth } from "../context/AuthContext"
 import { loginWithCredentials, googleAuth } from "../api/authApi"
+import GooglePhoneModal from "../Components/GooglePhoneModal"
 import logo from "../assets/logo2.png"
 
 import { useGoogleLogin } from "@react-oauth/google"
 
 const LoginPage = () => {
     const navigate = useNavigate()
-    const { signIn, isAuth } = useAuth()
+    const { signIn, updateUser, isAuth } = useAuth()
 
     useEffect(() => {
         if (isAuth) navigate("/home", { replace: true })
     }, [isAuth, navigate])
 
-    const [identifier, setIdentifier] = useState("")
+    const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")
     const [showPassword, setShowPassword] = useState(false)
     const [error, setError] = useState("")
     const [loading, setLoading] = useState(false)
+
+    // Google Phone Capture Modal State
+    const [showPhoneModal, setShowPhoneModal] = useState(false)
+    const [pendingGoogleData, setPendingGoogleData] = useState(null)
 
     const googleLoginHook = useGoogleLogin({
         onSuccess: async (tokenResponse) => {
@@ -29,19 +34,29 @@ const LoginPage = () => {
                 const data = await googleAuth({
                     accessToken: tokenResponse.access_token,
                 })
+
                 try {
                     localStorage.removeItem("merijodi_draft_profile")
                     localStorage.removeItem("merijodi_draft_step")
                     localStorage.removeItem("merijodi_draft_userId")
                 } catch (_) {}
+
                 signIn(data.token || data.accessToken, data.user)
-                if (data.isNewUser || !data.isProfileComplete) {
-                    navigate("/complete-profile")
+
+                // If Google user has no phone number, prompt for mandatory phone capture
+                const userPhone = data.user?.phone
+                if (data.needsPhone || !userPhone || String(userPhone).trim().length < 10) {
+                    setPendingGoogleData(data)
+                    setShowPhoneModal(true)
                 } else {
-                    navigate("/home")
+                    if (data.isNewUser || !data.isProfileComplete) {
+                        navigate("/complete-profile")
+                    } else {
+                        navigate("/home")
+                    }
                 }
             } catch (err) {
-                setError(err.response?.data?.message || "Google authentication failed.")
+                setError(err.response?.data?.message || "Google authentication failed. Please try again.")
             } finally {
                 setLoading(false)
             }
@@ -60,25 +75,35 @@ const LoginPage = () => {
         googleLoginHook()
     }
 
-    // Direct Login Submission
+    const handleGooglePhoneSuccess = (updatedUser) => {
+        setShowPhoneModal(false)
+        updateUser(updatedUser)
+        if (pendingGoogleData?.isNewUser || !pendingGoogleData?.isProfileComplete) {
+            navigate("/complete-profile")
+        } else {
+            navigate("/home")
+        }
+    }
+
+    // Direct Login Submission using Email and Password
     const handleLoginSubmit = async (e) => {
         if (e?.preventDefault) e.preventDefault()
         setError("")
 
-        const cleanInput = identifier.trim()
-        if (!cleanInput || !password) {
-            setError("Please enter your mobile number (or email) and password.")
+        const cleanEmail = email.trim()
+        if (!cleanEmail || !password) {
+            setError("Please enter your email address and password.")
             return
         }
 
         setLoading(true)
         try {
             const data = await loginWithCredentials({
-                phone: cleanInput.includes("@") ? undefined : cleanInput,
-                email: cleanInput.includes("@") ? cleanInput : undefined,
-                identifier: cleanInput,
+                email: cleanEmail.includes("@") ? cleanEmail : undefined,
+                identifier: cleanEmail,
                 password,
             })
+
             try {
                 localStorage.removeItem("merijodi_draft_profile")
                 localStorage.removeItem("merijodi_draft_step")
@@ -88,22 +113,11 @@ const LoginPage = () => {
             signIn(data.token || data.accessToken, data.user)
             navigate("/home")
         } catch (err) {
-            setError(err.response?.data?.message || "Invalid credentials. Please check your mobile/email and password.")
+            setError(err.response?.data?.message || "Invalid credentials. Please check your email and password.")
         } finally {
             setLoading(false)
         }
     }
-
-    /*
-    // ==========================================
-    // [COMMENTED OUT: TWILIO SMS LOGIN OTP VERIFICATION]
-    // OTP verification on login has been removed in favor of direct credential login.
-    const handleOtpSubmit = async (e) => {
-        if (e?.preventDefault) e.preventDefault()
-        // ...
-    }
-    // ==========================================
-    */
 
     return (
         <div className="min-h-screen w-full flex bg-[#FAF8F5]">
@@ -120,11 +134,11 @@ const LoginPage = () => {
                         Where Trusted Indian Matrimony Begins.
                     </h2>
                     <p className="text-[#6B7280] text-base leading-relaxed">
-                        Connect with verified profiles and find your ideal life partner with complete trust and privacy.
+                        Connect with verified profiles and find your ideal life partner with complete trust, dual-token security, and privacy.
                     </p>
                 </div>
                 <div className="text-xs text-[#9CA3AF]">
-                    © {new Date().getFullYear()} MeriJodi. All rights reserved.
+                    © {new Date().getFullYear()} MeriJodi. All rights reserved. • Support: +91 84463 60709
                 </div>
             </div>
 
@@ -143,7 +157,7 @@ const LoginPage = () => {
                                 Welcome Back
                             </h1>
                             <p className="text-sm text-[#6B7280]">
-                                Sign in with your mobile number or email address and password.
+                                Sign in with your registered email address and password.
                             </p>
                         </div>
 
@@ -156,16 +170,22 @@ const LoginPage = () => {
                         <form onSubmit={handleLoginSubmit} className="space-y-4">
                             <div>
                                 <label className="block text-xs font-semibold text-gray-700 mb-1 uppercase tracking-wider">
-                                    Mobile Number or Email *
+                                    Email Address *
                                 </label>
-                                <input
-                                    type="text"
-                                    placeholder="e.g. 9876543210 or you@example.com"
-                                    value={identifier}
-                                    onChange={(e) => setIdentifier(e.target.value)}
-                                    className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm focus:border-[#ED5463] focus:ring-2 focus:ring-[#ED5463]/20 focus:outline-none transition-all"
-                                    required
-                                />
+                                <div className="relative">
+                                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                                        <Mail className="w-4 h-4" />
+                                    </div>
+                                    <input
+                                        type="email"
+                                        placeholder="you@example.com"
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        className="w-full rounded-xl border border-gray-300 pl-10 pr-4 py-2.5 text-sm focus:border-[#ED5463] focus:ring-2 focus:ring-[#ED5463]/20 focus:outline-none transition-all"
+                                        required
+                                        autoFocus
+                                    />
+                                </div>
                             </div>
 
                             <div>
@@ -181,12 +201,15 @@ const LoginPage = () => {
                                     </Link>
                                 </div>
                                 <div className="relative">
+                                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                                        <Lock className="w-4 h-4" />
+                                    </div>
                                     <input
                                         type={showPassword ? "text" : "password"}
                                         placeholder="••••••••"
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
-                                        className="w-full rounded-xl border border-gray-300 px-4 py-2.5 pr-11 text-sm focus:border-[#ED5463] focus:ring-2 focus:ring-[#ED5463]/20 focus:outline-none transition-all"
+                                        className="w-full rounded-xl border border-gray-300 pl-10 pr-11 py-2.5 text-sm focus:border-[#ED5463] focus:ring-2 focus:ring-[#ED5463]/20 focus:outline-none transition-all"
                                         required
                                     />
                                     <button
@@ -256,6 +279,14 @@ const LoginPage = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Mandatory Google Mobile Phone Number Capture Modal */}
+            <GooglePhoneModal
+                isOpen={showPhoneModal}
+                user={pendingGoogleData?.user}
+                onSuccess={handleGooglePhoneSuccess}
+                onCancel={() => setShowPhoneModal(false)}
+            />
         </div>
     )
 }

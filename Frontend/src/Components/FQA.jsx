@@ -6,7 +6,7 @@ const FQA = () => {
   const faqs = [
     {
       question: "How does MeriJodi work?",
-      answer: "MeriJodi uses AI-powered matchmaking to connect compatible profiles based on interests, preferences, lifestyle, and values."
+      answer: "MeriJodi connects verified compatible profiles based on direct partner preferences, family values, education, and relationship goals."
     },
     {
       question: "Is registration free?",
@@ -14,11 +14,11 @@ const FQA = () => {
     },
     {
       question: "How do I create my profile?",
-      answer: "Simply sign up with your email or contact details, fill out basic details about yourself, set your preferences, and let our AI do the magic."
+      answer: "Simply sign up with your email and mobile number, enter your profile details step-by-step, set your ideal partner preferences, and submit for verification."
     },
     {
-      question: "What is the AI Matchmaking feature?",
-      answer: "Our AI systems evaluate multiple core pillars—from personality traits to lifestyle compatibility metrics—to introduce you to individuals who align with your long-term relationship goals."
+      question: "How are matches recommended?",
+      answer: "Our matchmaking engine evaluates partner criteria—including age range, community, education, occupation, location, and lifestyle preferences—to introduce you to highly compatible matches."
     },
     {
       question: "Can I chat with matches?",

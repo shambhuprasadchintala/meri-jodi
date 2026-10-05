@@ -25,6 +25,8 @@ router.get("/confirmations", adminController.getConfirmations.bind(adminControll
 router.get("/confirmation-users", adminController.getConfirmations.bind(adminController))
 router.post("/confirmations/:id/accept", validateObjectId("id"), validate, adminController.approveConfirmationUser.bind(adminController))
 router.put("/confirmations/:id/accept", validateObjectId("id"), validate, adminController.approveConfirmationUser.bind(adminController))
+router.post("/confirmations/:id/approve", validateObjectId("id"), validate, adminController.approveConfirmationUser.bind(adminController))
+router.put("/confirmations/:id/approve", validateObjectId("id"), validate, adminController.approveConfirmationUser.bind(adminController))
 router.post("/confirmations/:id/decline", validateObjectId("id"), validate, adminController.declineConfirmationUser.bind(adminController))
 router.put("/confirmations/:id/decline", validateObjectId("id"), validate, adminController.declineConfirmationUser.bind(adminController))
 router.post("/users/:id/approve", validateObjectId("id"), validate, adminController.approveConfirmationUser.bind(adminController))

@@ -65,6 +65,13 @@ class AuthService {
      * Generates authentication tokens so the user can complete profile details.
      */
     async registerUser({ name, email, password, phone, gender, location, res = null, reqIp = "127.0.0.1" }) {
+        const cleanEmail = email ? email.toLowerCase().trim() : ""
+        if (!cleanEmail || !cleanEmail.includes("@")) {
+            const error = new Error("A valid email address is required for registration.")
+            error.statusCode = 400
+            throw error
+        }
+
         const rawPhone = phone ? String(phone).trim() : ""
         const formattedPhone = this.formatPhoneNumber(rawPhone)
 
@@ -74,23 +81,26 @@ class AuthService {
             throw error
         }
 
-        const cleanEmail = email ? email.toLowerCase().trim() : undefined
-
-        // Check if user already exists with this phone number
-        const existingPhoneUser = await User.findOne({ phone: formattedPhone })
-        if (existingPhoneUser) {
-            const error = new Error("An account with this mobile number already exists. Please log in.")
+        if (!password || password.length < 6) {
+            const error = new Error("Password must be at least 6 characters long.")
             error.statusCode = 400
             throw error
         }
 
-        if (cleanEmail) {
-            const existingEmailUser = await User.findOne({ email: cleanEmail })
-            if (existingEmailUser) {
-                const error = new Error("An account with this email already exists. Please log in.")
-                error.statusCode = 400
-                throw error
-            }
+        // Check if user already exists with this email
+        const existingEmailUser = await User.findOne({ email: cleanEmail })
+        if (existingEmailUser) {
+            const error = new Error("An account with this email address already exists. Please sign in.")
+            error.statusCode = 400
+            throw error
+        }
+
+        // Check if user already exists with this phone number
+        const existingPhoneUser = await User.findOne({ phone: formattedPhone })
+        if (existingPhoneUser) {
+            const error = new Error("An account with this mobile number already exists. Please sign in.")
+            error.statusCode = 400
+            throw error
         }
 
         // Hash password
@@ -127,7 +137,7 @@ class AuthService {
             gender: cleanGender,
             location: cleanLocation,
             isPhoneVerified: true,
-            isEmailVerified: Boolean(cleanEmail),
+            isEmailVerified: true,
             isApproved: false,
             approvalStatus: "pending",
             status: USER_STATUS.PENDING_APPROVAL,
@@ -753,7 +763,7 @@ class AuthService {
      * Supports both JWT ID tokens (from authorization code flow) and
      * access_tokens (from useGoogleLogin implicit flow).
      */
-    async googleAuth({ idToken, credential, accessToken: incomingAccessToken, res = null }) {
+    async googleAuth({ idToken, credential, accessToken: incomingAccessToken, phone, res = null }) {
         const {
             googleId: verifiedGoogleId,
             email: verifiedEmail,
@@ -763,6 +773,16 @@ class AuthService {
             { idToken, credential, accessToken: incomingAccessToken },
             { clientId: config.google.clientId, client: googleOAuthClient },
         )
+
+        let formattedPhone = null
+        if (phone) {
+            formattedPhone = this.formatPhoneNumber(phone)
+            if (formattedPhone && formattedPhone.length < 10) {
+                const error = new Error("Please enter a valid 10-digit mobile phone number.")
+                error.statusCode = 400
+                throw error
+            }
+        }
 
         let user = null
         let isNewUser = false
@@ -774,7 +794,7 @@ class AuthService {
         }
 
         if (user) {
-            if (user.status !== USER_STATUS.ACTIVE) {
+            if (user.status === USER_STATUS.BANNED || user.status === USER_STATUS.INACTIVE) {
                 const error = new Error("Your account is inactive or suspended.")
                 error.statusCode = 403
                 throw error
@@ -789,6 +809,16 @@ class AuthService {
             if (verifiedName && (!user.name || user.name === "Google Member" || user.name === "MeriJodi Member" || user.name === "New Member")) {
                 user.name = verifiedName
             }
+            if (formattedPhone && !user.phone) {
+                const conflict = await User.findOne({ phone: formattedPhone, _id: { $ne: user._id } })
+                if (conflict) {
+                    const error = new Error("This mobile number is already registered with another account.")
+                    error.statusCode = 400
+                    throw error
+                }
+                user.phone = formattedPhone
+                user.isPhoneVerified = true
+            }
             user.isEmailVerified = true
             user.lastLogin = new Date()
             await user.save()
@@ -802,13 +832,27 @@ class AuthService {
             }
         } else {
             isNewUser = true
+
+            if (formattedPhone) {
+                const conflict = await User.findOne({ phone: formattedPhone })
+                if (conflict) {
+                    const error = new Error("This mobile number is already registered with another account.")
+                    error.statusCode = 400
+                    throw error
+                }
+            }
+
             user = await User.create({
                 name: verifiedName || "MeriJodi Member",
                 email: verifiedEmail ? verifiedEmail.toLowerCase().trim() : undefined,
+                phone: formattedPhone || undefined,
                 googleId: verifiedGoogleId,
                 avatar: verifiedAvatar,
                 isEmailVerified: true,
-                status: USER_STATUS.ACTIVE,
+                isPhoneVerified: Boolean(formattedPhone),
+                isApproved: false,
+                approvalStatus: "pending",
+                status: USER_STATUS.PENDING_APPROVAL,
                 lastLogin: new Date(),
             })
 
@@ -818,7 +862,9 @@ class AuthService {
                 {
                     userId: user._id,
                     name: user.name,
-                    isVerified: true,
+                    isVerified: false,
+                    isApproved: false,
+                    approvalStatus: "pending",
                 },
                 { upsert: true, new: true, setDefaultsOnInsert: true }
             )
@@ -827,6 +873,7 @@ class AuthService {
         // Check if user already has an existing completed profile AND mobile number
         const userProfile = await Profile.findOne({ userId: user._id })
         const hasPhone = Boolean(user.phone && user.phone.trim().length >= 10)
+        const needsPhone = !hasPhone
         const isProfileComplete = Boolean(
             userProfile &&
             (userProfile.profileCompletionPct >= 30 || userProfile.location?.city || userProfile.religion) &&
@@ -847,6 +894,8 @@ class AuthService {
             refreshToken,
             isNewUser,
             isProfileComplete,
+            hasPhone,
+            needsPhone,
         }
     }
 
@@ -991,7 +1040,7 @@ class AuthService {
 
         const updatedUser = await User.findByIdAndUpdate(
             userId,
-            { phone: formattedPhone },
+            { phone: formattedPhone, isPhoneVerified: true },
             { new: true }
         )
 
