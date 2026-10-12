@@ -1,6 +1,6 @@
 # Production authentication
 
-The frontend is deployed at `https://meri-jodi-amber.vercel.app` and the Express backend at `https://meri-jodi-2.onrender.com`.
+The frontend is deployed at `https://www.merijodi.com` (with redirect from `https://merijodi.com` and fallback `https://meri-jodi-amber.vercel.app`) and the Express backend at `https://meri-jodi-2.onrender.com`.
 
 ## Vercel
 
@@ -8,7 +8,7 @@ Use the `Frontend` root directory, `npm run build`, and the `dist` output direct
 
 ```dotenv
 VITE_API_BASE_URL=https://meri-jodi-2.onrender.com
-VITE_APP_URL=https://meri-jodi-amber.vercel.app
+VITE_APP_URL=https://www.merijodi.com
 VITE_GOOGLE_CLIENT_ID=<the public Google web client ID>
 ```
 
@@ -22,8 +22,8 @@ Keep the existing database, Redis, signing, Google client ID, and media configur
 
 ```dotenv
 NODE_ENV=production
-FRONTEND_DOMAIN=https://meri-jodi-amber.vercel.app
-FRONTEND_URL=https://meri-jodi-amber.vercel.app
+FRONTEND_DOMAIN=https://www.merijodi.com
+FRONTEND_URL=https://www.merijodi.com
 MAIL_PROVIDER=brevo
 MAIL_FROM_EMAIL=<a verified sender email in Brevo>
 BREVO_API_KEY=<enter the secret directly in Render>
@@ -40,6 +40,8 @@ Save the environment settings and deploy the updated backend. Never disable veri
 Use the same Google web OAuth client ID in the Vercel frontend and Render backend. Its authorized JavaScript origins must include:
 
 ```text
+https://www.merijodi.com
+https://merijodi.com
 https://meri-jodi-amber.vercel.app
 ```
 

@@ -23,6 +23,9 @@ export const configureSecurity = (config) => {
                 const isAllowed =
                     allowedOrigins.includes(origin) ||
                     allowedOrigins.includes(normalized) ||
+                    normalized === "https://www.merijodi.com" ||
+                    normalized === "https://merijodi.com" ||
+                    normalized.endsWith(".merijodi.com") ||
                     (normalized.endsWith(".vercel.app") && normalized.includes("meri-jodi")) ||
                     (config.env !== "production" && (origin.startsWith("http://localhost") || origin.startsWith("http://127.0.0.1")))
 

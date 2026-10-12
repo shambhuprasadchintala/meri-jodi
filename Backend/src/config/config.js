@@ -76,6 +76,8 @@ const _config = {
             allowedOrigins: [
                 process.env.FRONTEND_DOMAIN,
                 process.env.FRONTEND_URL,
+                "https://www.merijodi.com",
+                "https://merijodi.com",
                 "https://meri-jodi-amber.vercel.app",
                 ...(process.env.NODE_ENV !== "production"
                     ? [

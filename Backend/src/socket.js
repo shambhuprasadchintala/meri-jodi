@@ -12,6 +12,8 @@ const setupSocket = (httpServer) => {
             origin: [
                 config.frontendDomain,
                 config.frontendUrl,
+                "https://www.merijodi.com",
+                "https://merijodi.com",
                 "https://meri-jodi-amber.vercel.app",
                 ...(config.env !== "production"
                     ? ["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:5174", "http://127.0.0.1:5174"]
