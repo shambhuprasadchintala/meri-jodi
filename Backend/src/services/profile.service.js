@@ -217,7 +217,15 @@ class ProfileService {
      * @returns {Promise<object|null>} Profile or null
      */
     async getByUserId(userId) {
-        return Profile.findOne({ userId }).populate("userId", "name email phone avatar")
+        const profile = await Profile.findOne({ userId }).populate("userId", "name email phone avatar")
+        if (profile) {
+            const completion = this._calculateCompletion(profile)
+            if (profile.profileCompletionPct !== completion) {
+                profile.profileCompletionPct = completion
+                await Profile.updateOne({ _id: profile._id }, { $set: { profileCompletionPct: completion } })
+            }
+        }
+        return profile
     }
 
     /**
@@ -226,7 +234,15 @@ class ProfileService {
      * @returns {Promise<object|null>} Profile or null
      */
     async getById(id) {
-        return Profile.findById(id).populate("userId", "name email phone avatar")
+        const profile = await Profile.findById(id).populate("userId", "name email phone avatar")
+        if (profile) {
+            const completion = this._calculateCompletion(profile)
+            if (profile.profileCompletionPct !== completion) {
+                profile.profileCompletionPct = completion
+                await Profile.updateOne({ _id: profile._id }, { $set: { profileCompletionPct: completion } })
+            }
+        }
+        return profile
     }
 
     /**
@@ -476,56 +492,29 @@ class ProfileService {
      * @returns {number} Completion percentage
      */
     _calculateCompletion(profile) {
-        const fields = [
-            "dateOfBirth",
-            "timeOfBirth",
-            "gender",
-            "heightCm",
-            "religion",
-            "caste",
-            "maritalStatus",
-            "aboutMe",
-            "motherTongue",
-            "placeOfBirth",
-            "manglik",
+        if (!profile) return 0
+
+        const checks = [
+            { check: Boolean(profile.name || (typeof profile.userId === "object" && profile.userId?.name)), weight: 8 },
+            { check: Boolean(profile.dateOfBirth), weight: 8 },
+            { check: Boolean(profile.gender), weight: 8 },
+            { check: Boolean(profile.location?.city), weight: 8 },
+            { check: Boolean(profile.religion), weight: 8 },
+            { check: Boolean(profile.motherTongue), weight: 8 },
+            { check: Boolean(profile.education?.highestDegree), weight: 8 },
+            { check: Boolean(profile.career?.occupation), weight: 8 },
+            { check: Boolean(profile.career?.annualIncome), weight: 8 },
+            { check: Boolean(profile.maritalStatus), weight: 8 },
+            { check: Boolean(profile.photos && profile.photos.length > 0), weight: 10 },
+            { check: Boolean(profile.aboutMe && profile.aboutMe.trim().length >= 20), weight: 10 },
         ]
 
-        const nestedFields = {
-            location: ["city", "state"],
-            education: ["highestDegree", "institution"],
-            career: ["occupation", "companyName", "annualIncome"],
-            family: [
-                "fatherOccupation",
-                "motherOccupation",
-                "familyType",
-                "familyValues",
-            ],
-            lifestyle: ["diet"],
+        let score = 0
+        for (const item of checks) {
+            if (item.check) score += item.weight
         }
 
-        let filled = 0
-        let total = fields.length
-
-        for (const field of fields) {
-            if (profile[field]) filled++
-        }
-
-        for (const [group, subfields] of Object.entries(nestedFields)) {
-            for (const subfield of subfields) {
-                total++
-                if (profile[group] && profile[group][subfield]) filled++
-            }
-        }
-
-        // Photos
-        total++
-        if (profile.photos && profile.photos.length > 0) filled++
-
-        // Hobbies
-        total++
-        if (profile.hobbiesAndInterests && profile.hobbiesAndInterests.length > 0) filled++
-
-        return Math.min(100, Math.max(0, Math.round((filled / total) * 100)))
+        return Math.min(100, Math.max(0, score))
     }
 
     async recordView(viewerUserId, targetProfileId) {

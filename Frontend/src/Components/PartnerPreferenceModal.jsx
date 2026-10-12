@@ -42,6 +42,38 @@ const POPULAR_HOBBIES = [
 
 const DIET_OPTIONS = ["Vegetarian", "Non-Vegetarian", "Eggetarian", "Jain", "Vegan"]
 
+const EDUCATIONS = [
+    "High School",
+    "Diploma",
+    "Bachelor's Degree",
+    "Master's Degree",
+    "MBA",
+    "M.Tech",
+    "PhD",
+]
+
+const OCCUPATIONS = [
+    "Software Engineer",
+    "Private Sector",
+    "Doctor",
+    "Teacher",
+    "Business",
+    "Government Employee",
+    "Lawyer",
+    "Self Employed",
+    "Other",
+]
+
+const INCOME_RANGES = [
+    "Below ₹2 LPA",
+    "₹2 - ₹5 LPA",
+    "₹5 - ₹10 LPA",
+    "₹10 - ₹20 LPA",
+    "₹20 - ₹35 LPA",
+    "₹35 - ₹50 LPA",
+    "Above ₹50 LPA",
+]
+
 export default function PartnerPreferenceModal({ isOpen, preferences, onClose, onSave }) {
     const [formData, setFormData] = useState({
         ageMin: 21,
@@ -270,38 +302,7 @@ export default function PartnerPreferenceModal({ isOpen, preferences, onClose, o
                         </div>
                     )}
 
-                    {/* Age Range with Min 18 and +2 year constraint */}
-                    <div>
-                        <label className="block text-xs font-bold text-gray-800 uppercase tracking-wider mb-2">
-                            Age Range: {formData.ageMin} - {formData.ageMax} Years (Min. 18, Max $\ge$ Min + 2)
-                        </label>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <span className="text-xs text-gray-500">Min Age (18+)</span>
-                                <input
-                                    type="number"
-                                    name="ageMin"
-                                    min="18"
-                                    max="78"
-                                    value={formData.ageMin}
-                                    onChange={(e) => handleMinAgeChange(e.target.value)}
-                                    className="w-full mt-1 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:bg-white focus:border-[#842029] outline-none"
-                                />
-                            </div>
-                            <div>
-                                <span className="text-xs text-gray-500">Max Age (Min: {minAllowedMax})</span>
-                                <input
-                                    type="number"
-                                    name="ageMax"
-                                    min={minAllowedMax}
-                                    max="80"
-                                    value={formData.ageMax}
-                                    onChange={handleChange}
-                                    className="w-full mt-1 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:bg-white focus:border-[#842029] outline-none"
-                                />
-                            </div>
-                        </div>
-                    </div>
+
 
                     {/* Height Range (Min 120cm / 4'0") */}
                     <div>
@@ -463,27 +464,41 @@ export default function PartnerPreferenceModal({ isOpen, preferences, onClose, o
                             <label className="block text-xs font-bold text-gray-800 uppercase tracking-wider mb-1">
                                 Minimum Education
                             </label>
-                            <input
-                                type="text"
+                            <select
                                 name="education"
-                                placeholder="e.g. Bachelor's, Master's, B.Tech"
                                 value={formData.education}
                                 onChange={handleChange}
                                 className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs sm:text-sm focus:bg-white focus:border-[#842029] outline-none"
-                            />
+                            >
+                                <option value="">Select Education</option>
+                                <option value="No Preference">No Preference</option>
+                                {formData.education && !["No Preference", ...EDUCATIONS].includes(formData.education) && (
+                                    <option value={formData.education}>{formData.education}</option>
+                                )}
+                                {EDUCATIONS.map((ed) => (
+                                    <option key={ed} value={ed}>{ed}</option>
+                                ))}
+                            </select>
                         </div>
                         <div>
                             <label className="block text-xs font-bold text-gray-800 uppercase tracking-wider mb-1">
                                 Preferred Occupation
                             </label>
-                            <input
-                                type="text"
+                            <select
                                 name="occupation"
-                                placeholder="e.g. Software Engineer, Doctor, CA"
                                 value={formData.occupation}
                                 onChange={handleChange}
                                 className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs sm:text-sm focus:bg-white focus:border-[#842029] outline-none"
-                            />
+                            >
+                                <option value="">Select Occupation</option>
+                                <option value="No Preference">No Preference</option>
+                                {formData.occupation && !["No Preference", ...OCCUPATIONS].includes(formData.occupation) && (
+                                    <option value={formData.occupation}>{formData.occupation}</option>
+                                )}
+                                {OCCUPATIONS.map((occ) => (
+                                    <option key={occ} value={occ}>{occ}</option>
+                                ))}
+                            </select>
                         </div>
                     </div>
 
@@ -491,16 +506,23 @@ export default function PartnerPreferenceModal({ isOpen, preferences, onClose, o
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-xs font-bold text-gray-800 uppercase tracking-wider mb-1">
-                                Direct Annual Income Preference
+                                Annual Income Preference
                             </label>
-                            <input
-                                type="text"
+                            <select
                                 name="annualIncome"
-                                placeholder="e.g. 10 LPA+, ₹25,00,000, 15 Lakhs"
                                 value={formData.annualIncome}
                                 onChange={handleChange}
                                 className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs sm:text-sm focus:bg-white focus:border-[#842029] outline-none"
-                            />
+                            >
+                                <option value="">Select Income Range</option>
+                                <option value="No Preference">No Preference</option>
+                                {formData.annualIncome && !["No Preference", ...INCOME_RANGES].includes(formData.annualIncome) && (
+                                    <option value={formData.annualIncome}>{formData.annualIncome}</option>
+                                )}
+                                {INCOME_RANGES.map((inc) => (
+                                    <option key={inc} value={inc}>{inc}</option>
+                                ))}
+                            </select>
                         </div>
                         <div>
                             <label className="block text-xs font-bold text-gray-800 uppercase tracking-wider mb-1">
@@ -518,40 +540,6 @@ export default function PartnerPreferenceModal({ isOpen, preferences, onClose, o
                                 ))}
                             </select>
                         </div>
-                    </div>
-
-                    {/* Hobbies & Interests Tags (Figma Screenshot 2 style) */}
-                    <div>
-                        <label className="block text-xs font-bold text-gray-800 uppercase tracking-wider mb-1">
-                            Hobbies &amp; Interests Preference
-                        </label>
-                        <div className="flex flex-wrap gap-1.5 mb-2 max-h-36 overflow-y-auto p-1.5 border border-gray-100 rounded-2xl bg-gray-50/50">
-                            {(showAllHobbies ? POPULAR_HOBBIES : POPULAR_HOBBIES.slice(0, 12)).map((h) => {
-                                const isSelected = formData.hobbiesAndInterests?.includes(h)
-                                return (
-                                    <button
-                                        key={h}
-                                        type="button"
-                                        onClick={() => handleHobbyToggle(h)}
-                                        className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1 border cursor-pointer ${
-                                            isSelected
-                                                ? "bg-[#842029] text-white border-[#842029] shadow-2xs"
-                                                : "bg-white text-gray-700 border-gray-200 hover:border-[#842029]"
-                                        }`}
-                                    >
-                                        {isSelected && <Check size={11} />}
-                                        {h}
-                                    </button>
-                                )
-                            })}
-                        </div>
-                        <button
-                            type="button"
-                            onClick={() => setShowAllHobbies(!showAllHobbies)}
-                            className="text-[11px] font-semibold text-[#842029] hover:underline cursor-pointer"
-                        >
-                            {showAllHobbies ? "Show Less" : "Show More Hobbies"}
-                        </button>
                     </div>
 
                     {/* Marital Status Multi-Select */}

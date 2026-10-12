@@ -76,6 +76,8 @@ export default function PersonalDetails({
   errors,
   setErrors,
   nextStep,
+  submitForm,
+  loading = false,
 }) {
   const [showAllHobbies, setShowAllHobbies] = useState(false)
   const [customHobbyInput, setCustomHobbyInput] = useState("")
@@ -150,7 +152,11 @@ export default function PersonalDetails({
 
   const handleContinue = () => {
     if (validate()) {
-      nextStep()
+      if (submitForm) {
+        submitForm()
+      } else if (nextStep) {
+        nextStep()
+      }
     }
   }
 
@@ -300,16 +306,16 @@ export default function PersonalDetails({
               }`}
             >
               <option value="">Select Occupation</option>
-              {formData.occupation && !["Software Engineer", "Doctor", "Teacher", "Business", "Government Employee", "Lawyer", "Student", "Self Employed", "Other"].includes(formData.occupation) && (
+              {formData.occupation && !["Software Engineer", "Doctor", "Teacher", "Business", "Government Employee", "Lawyer", "Private Sector", "Self Employed", "Other"].includes(formData.occupation) && (
                 <option value={formData.occupation}>{formData.occupation}</option>
               )}
               <option value="Software Engineer">Software Engineer</option>
+              <option value="Private Sector">Private Sector</option>
               <option value="Doctor">Doctor</option>
               <option value="Teacher">Teacher</option>
               <option value="Business">Business</option>
               <option value="Government Employee">Government Employee</option>
               <option value="Lawyer">Lawyer</option>
-              <option value="Student">Student</option>
               <option value="Self Employed">Self Employed</option>
               <option value="Other">Other</option>
             </select>
@@ -458,9 +464,10 @@ export default function PersonalDetails({
           <button
             type="button"
             onClick={handleContinue}
-            className="w-full py-3.5 rounded-xl bg-[#ED5463] text-white hover:bg-[#AE2539] transition-all shadow-lg font-bold text-sm cursor-pointer"
+            disabled={loading}
+            className="w-full py-3.5 rounded-xl bg-[#ED5463] text-white hover:bg-[#AE2539] transition-all shadow-lg font-bold text-sm cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            Continue to Preferences &rarr;
+            {loading ? "Completing Profile..." : "Complete Profile & Submit →"}
           </button>
         </div>
       </div>

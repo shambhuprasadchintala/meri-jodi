@@ -227,16 +227,41 @@ export default function BasicInfo({
           <label className="font-medium mb-2 block text-gray-700 text-sm">
             Time of Birth / Birth Timing <span className="text-xs text-gray-400 font-normal">(Optional)</span>
           </label>
-          <input
-            type="text"
-            value={formData.timeOfBirth || formData.birthTiming || ""}
-            onChange={(e) => {
-              updateField("timeOfBirth", e.target.value)
-              updateField("birthTiming", e.target.value)
-            }}
-            placeholder="e.g. 09:30 AM or 14:15"
-            className="w-full py-[10px] px-3 rounded-[10px] border-2 border-[#DFDFDF] hover:border-[#842029] focus:border-[#842029] outline-none transition-colors text-sm"
-          />
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={(() => {
+                const val = formData.timeOfBirth || formData.birthTiming || ""
+                return val.replace(/\s*(AM|PM|am|pm)$/i, "").trim()
+              })()}
+              onChange={(e) => {
+                const raw = e.target.value
+                const currentPeriod = (formData.timeOfBirth || formData.birthTiming || "").match(/(AM|PM)/i)?.[1]?.toUpperCase() || "AM"
+                const combined = raw.trim() ? `${raw.trim()} ${currentPeriod}` : ""
+                updateField("timeOfBirth", combined)
+                updateField("birthTiming", combined)
+              }}
+              placeholder="e.g. 04:05"
+              className="flex-1 py-[10px] px-3 rounded-[10px] border-2 border-[#DFDFDF] hover:border-[#842029] focus:border-[#842029] outline-none transition-colors text-sm"
+            />
+            <select
+              value={(() => {
+                const val = formData.timeOfBirth || formData.birthTiming || ""
+                return val.match(/PM/i) ? "PM" : "AM"
+              })()}
+              onChange={(e) => {
+                const period = e.target.value
+                const currentRaw = (formData.timeOfBirth || formData.birthTiming || "").replace(/\s*(AM|PM|am|pm)$/i, "").trim()
+                const combined = currentRaw ? `${currentRaw} ${period}` : ""
+                updateField("timeOfBirth", combined)
+                updateField("birthTiming", combined)
+              }}
+              className="w-24 py-[10px] px-2 rounded-[10px] border-2 border-[#DFDFDF] hover:border-[#842029] focus:border-[#842029] outline-none transition-colors text-sm font-semibold bg-white cursor-pointer"
+            >
+              <option value="AM">AM</option>
+              <option value="PM">PM</option>
+            </select>
+          </div>
         </div>
       </div>
 

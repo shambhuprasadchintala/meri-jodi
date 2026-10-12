@@ -11,8 +11,10 @@ const setupSocket = (httpServer) => {
         cors: {
             origin: [
                 config.frontendDomain,
+                config.frontendUrl,
+                "https://meri-jodi-amber.vercel.app",
                 ...(config.env !== "production"
-                    ? ["http://localhost:5173", "http://127.0.0.1:5173"]
+                    ? ["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:5174", "http://127.0.0.1:5174"]
                     : []),
             ].filter(Boolean),
             methods: ["GET", "POST"],

@@ -615,12 +615,7 @@ function MyProfile() {
                         </button>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <PreferenceField
-                            label="Age Range"
-                            value={preferences?.ageMin ? `${preferences.ageMin} - ${preferences.ageMax || 40} Years` : null}
-                            onEdit={() => setIsPrefModalOpen(true)}
-                        />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         <PreferenceField
                             label="Height Range"
                             value={preferences?.heightMinCm ? `${preferences.heightMinCm}cm - ${preferences.heightMaxCm || 200}cm` : null}

@@ -27,21 +27,28 @@ authApi.interceptors.response.use(
         if (
             error.response?.status === 401 &&
             !originalRequest._retry &&
-            !originalRequest.url.includes("/login") &&
-            !originalRequest.url.includes("/register") &&
-            !originalRequest.url.includes("/refresh")
+            !originalRequest.url?.includes("/login") &&
+            !originalRequest.url?.includes("/register") &&
+            !originalRequest.url?.includes("/refresh")
         ) {
             originalRequest._retry = true
             try {
-                const refreshRes = await authApi.post("/refresh")
+                const storedRefreshToken = localStorage.getItem("refreshToken")
+                const refreshRes = await authApi.post("/refresh", { refreshToken: storedRefreshToken })
                 const newToken = refreshRes.data?.data?.token || refreshRes.data?.data?.accessToken
+                const newRefreshToken = refreshRes.data?.data?.refreshToken
                 if (newToken) {
                     localStorage.setItem("token", newToken)
+                    if (newRefreshToken) {
+                        localStorage.setItem("refreshToken", newRefreshToken)
+                    }
                     originalRequest.headers.Authorization = `Bearer ${newToken}`
                     return authApi(originalRequest)
                 }
             } catch (_refreshErr) {
                 localStorage.removeItem("token")
+                localStorage.removeItem("refreshToken")
+                window.dispatchEvent(new CustomEvent("auth:logout"))
             }
         }
         return Promise.reject(error)

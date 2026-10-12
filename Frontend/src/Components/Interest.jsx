@@ -23,12 +23,12 @@ const educations = [
 
 const occupations = [
   "Software Engineer",
+  "Private Sector",
   "Doctor",
   "Teacher",
   "Business",
   "Government Employee",
   "Lawyer",
-  "Student",
   "Self Employed",
   "Other",
 ];
@@ -178,27 +178,6 @@ export default function Interest({
   const validate = () => {
     let err = {};
 
-    const minA = Number(formData.minAge);
-    const maxA = Number(formData.maxAge);
-
-    if (!formData.minAge) {
-      err.minAge = "Select minimum age (min. 18)";
-    } else if (minA < 18) {
-      err.minAge = "Minimum age must be at least 18";
-    }
-
-    if (!formData.maxAge) {
-      err.maxAge = "Select maximum age";
-    } else if (maxA < (minA || 18) + 2) {
-      err.maxAge = `Maximum age must be at least 2 years greater than minimum age (min. ${(minA || 18) + 2})`;
-    }
-
-    if (!formData.religion) err.religion = "Select religion";
-    if (!formData.motherTongue) err.motherTongue = "Select mother tongue";
-    if (!formData.partnereducation) err.partnereducation = "Select education";
-    if (!formData.partneroccupation) err.partneroccupation = "Select occupation";
-    if (!formData.partnerincome) err.partnerincome = "Select income";
-
     if (locationsList.length === 0) {
       err.city = "Please add at least 1 preferred city or state (min 1, max 10).";
     }
@@ -234,59 +213,6 @@ export default function Interest({
       </div>
 
       <div className="bg-white rounded-3xl shadow-xl border border-pink-100 p-5 sm:p-7">
-        {/* AGE RANGE: Min Age & Max Age with +2 years constraint */}
-        <div className="mb-5">
-          <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
-            Age Preference Range (Min 18, Max must be at least 2 years more)
-          </label>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <select
-                value={formData.minAge || ""}
-                onChange={(e) => handleMinAgeChange(e.target.value)}
-                className={`w-full h-13 rounded-xl border-2 px-4 focus:outline-none transition-all text-sm ${
-                  errors.minAge
-                    ? "border-red-400 bg-red-50/20"
-                    : "border-[#DFDFDF] hover:border-[#AE2539] focus:border-[#AE2539]"
-                }`}
-              >
-                <option value="">Minimum Age (18+)</option>
-                {Array.from({ length: 43 }, (_, i) => 18 + i).map((age) => (
-                  <option key={age} value={age}>
-                    {age} Years
-                  </option>
-                ))}
-              </select>
-              {errors.minAge && (
-                <p className="text-xs text-red-500 mt-1.5 font-medium">{errors.minAge}</p>
-              )}
-            </div>
-
-            <div>
-              <select
-                value={formData.maxAge || ""}
-                onChange={(e) => updateField("maxAge", e.target.value)}
-                className={`w-full h-13 rounded-xl border-2 px-4 focus:outline-none transition-all text-sm ${
-                  errors.maxAge
-                    ? "border-red-400 bg-red-50/20"
-                    : "border-[#DFDFDF] hover:border-[#AE2539] focus:border-[#AE2539]"
-                }`}
-              >
-                <option value="">
-                  Maximum Age (Min: {maxAgeStart} Years)
-                </option>
-                {Array.from({ length: 80 - maxAgeStart + 1 }, (_, i) => maxAgeStart + i).map((age) => (
-                  <option key={age} value={age}>
-                    {age} Years
-                  </option>
-                ))}
-              </select>
-              {errors.maxAge && (
-                <p className="text-xs text-red-500 mt-1.5 font-medium">{errors.maxAge}</p>
-              )}
-            </div>
-          </div>
-        </div>
 
         {/* Religion & Mother Tongue */}
         <div className="grid md:grid-cols-2 gap-5 mb-5">
@@ -394,7 +320,8 @@ export default function Interest({
               }`}
             >
               <option value="">Select Education</option>
-              {formData.partnereducation && !educations.includes(formData.partnereducation) && (
+              <option value="No Preference">No Preference</option>
+              {formData.partnereducation && !["No Preference", ...educations].includes(formData.partnereducation) && (
                 <option value={formData.partnereducation}>{formData.partnereducation}</option>
               )}
               {educations.map((item) => (
@@ -425,7 +352,8 @@ export default function Interest({
               }`}
             >
               <option value="">Select Occupation</option>
-              {formData.partneroccupation && !occupations.includes(formData.partneroccupation) && (
+              <option value="No Preference">No Preference</option>
+              {formData.partneroccupation && !["No Preference", ...occupations].includes(formData.partneroccupation) && (
                 <option value={formData.partneroccupation}>{formData.partneroccupation}</option>
               )}
               {occupations.map((item) => (
@@ -453,7 +381,8 @@ export default function Interest({
               }`}
             >
               <option value="">Select Income Range</option>
-              {formData.partnerincome && !incomeRanges.includes(formData.partnerincome) && (
+              <option value="No Preference">No Preference</option>
+              {formData.partnerincome && !["No Preference", ...incomeRanges].includes(formData.partnerincome) && (
                 <option value={formData.partnerincome}>{formData.partnerincome}</option>
               )}
               {incomeRanges.map((item) => (
@@ -540,67 +469,7 @@ export default function Interest({
           )}
         </div>
 
-        {/* Hobbies & Interests Selection (Figma Screenshot 2 style) */}
-        <div className="mt-6 pt-5 border-t border-gray-100">
-          <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-            Choose Hobbies &amp; Interests
-          </h3>
-          <p className="text-xs text-gray-500 mb-3">
-            Select hobbies you would love in your ideal partner
-          </p>
 
-          <div className="flex flex-wrap gap-2">
-            {(showAllHobbies ? hobbiesList : hobbiesList.slice(0, 12)).map((hobby) => (
-              <button
-                key={hobby}
-                type="button"
-                onClick={() => toggleSelection("hobbies", hobby)}
-                className={`px-4 py-2 rounded-full text-xs font-medium border-2 transition-all duration-200 cursor-pointer ${
-                  formData.hobbies?.includes(hobby)
-                    ? "bg-[#ED5463] text-white border-[#ED5463] shadow-xs"
-                    : "border-[#DFDFDF] hover:border-[#AE2539] hover:text-[#AE2539] text-gray-600 bg-white"
-                }`}
-              >
-                {hobby}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex items-center justify-between mt-3">
-            <button
-              type="button"
-              onClick={() => setShowAllHobbies(!showAllHobbies)}
-              className="text-[#ED5463] font-semibold text-xs sm:text-sm hover:text-[#AE2539] cursor-pointer"
-            >
-              {showAllHobbies ? "Show Less" : "Show More"}
-            </button>
-          </div>
-
-          {/* Add Custom Hobby */}
-          <div className="mt-3 flex gap-2 max-w-sm">
-            <input
-              type="text"
-              value={customHobbyInput}
-              placeholder="Add other hobby..."
-              onChange={(e) => setCustomHobbyInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  handleAddCustomHobby();
-                }
-              }}
-              className="flex-1 px-3.5 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-full focus:outline-none focus:border-[#ED5463]"
-            />
-            <button
-              type="button"
-              onClick={handleAddCustomHobby}
-              disabled={!customHobbyInput.trim()}
-              className="px-3.5 py-1.5 rounded-full bg-gray-800 text-white text-xs font-semibold hover:bg-black disabled:opacity-40 cursor-pointer"
-            >
-              Add
-            </button>
-          </div>
-        </div>
 
         {/* Submit Button */}
         <div className="mt-8">

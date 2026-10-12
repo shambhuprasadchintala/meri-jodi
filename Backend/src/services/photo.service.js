@@ -11,17 +11,27 @@ class PhotoService {
      * @returns {Promise<object>} Updated profile
      */
     async upload(userId, file, options = {}) {
-        const profile = await Profile.findOne({ userId })
-        if (!profile) throw new Error("Profile not found")
+        let profile = await Profile.findOne({ userId })
+        if (!profile) {
+            const user = await User.findById(userId)
+            profile = await Profile.create({
+                userId,
+                name: user?.name,
+                gender: user?.gender || "female",
+                photos: [],
+            })
+        }
 
         // Limit to 6 photos
-        if (profile.photos.length >= 6) {
+        if (profile.photos && profile.photos.length >= 6) {
             throw new Error("Maximum 6 photos allowed")
         }
 
         // If first photo, make it primary
         const isPrimary =
-            profile.photos.length === 0 ? true : options.isPrimary || false
+            (!profile.photos || profile.photos.length === 0) ? true : options.isPrimary || false
+
+        if (!profile.photos) profile.photos = []
 
         // If setting as primary, unset other primary photos
         if (isPrimary) {
@@ -37,6 +47,9 @@ class PhotoService {
         }
 
         profile.photos.push(photo)
+        if (typeof profile.profileCompletionPct === "number") {
+            profile.profileCompletionPct = Math.min(100, profile.profileCompletionPct + 10)
+        }
         await profile.save()
 
         if (isPrimary) {

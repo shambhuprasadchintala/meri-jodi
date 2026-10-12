@@ -9,7 +9,7 @@ export default function AdminProtectedRoute({ children }) {
   const location = useLocation()
   const adminToken = localStorage.getItem("admin_token")
   
-  let adminUser = null
+  let adminUser
   try {
     adminUser = JSON.parse(localStorage.getItem("admin_user") || "null")
   } catch {

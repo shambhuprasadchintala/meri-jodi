@@ -20,7 +20,10 @@ router.get("/", (req, res, next) => {
 })
 router.post("/", sendInterest, validate, interestController.sendInterest.bind(interestController))
 router.put("/:id/accept", validateObjectId("id"), validate, interestController.acceptInterest.bind(interestController))
+router.patch("/:id/accept", validateObjectId("id"), validate, interestController.acceptInterest.bind(interestController))
 router.put("/:id/decline", validateObjectId("id"), validate, interestController.declineInterest.bind(interestController))
+router.patch("/:id/decline", validateObjectId("id"), validate, interestController.declineInterest.bind(interestController))
 router.put("/:id/withdraw", validateObjectId("id"), validate, interestController.withdrawInterest.bind(interestController))
+router.patch("/:id/withdraw", validateObjectId("id"), validate, interestController.withdrawInterest.bind(interestController))
 
 export default router

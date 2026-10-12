@@ -52,6 +52,7 @@ const setupApp = () => {
     app.use("/api/v1/auth", authRoutes)
 
     // Health check (public)
+    app.use("/health", healthRoutes)
     app.use("/api/health", healthRoutes)
     app.use("/api/v1/health", healthRoutes)
 

@@ -23,8 +23,11 @@ export const AuthProvider = ({ children }) => {
         setToken(newToken)
     }, [])
 
-    const signIn = useCallback((newToken, userData) => {
+    const signIn = useCallback((newToken, userData, newRefreshToken) => {
         saveToken(newToken)
+        if (newRefreshToken) {
+            localStorage.setItem("refreshToken", newRefreshToken)
+        }
         setUser(userData)
     }, [saveToken])
 
@@ -35,6 +38,7 @@ export const AuthProvider = ({ children }) => {
             // ignore network errors on signout
         } finally {
             saveToken(null)
+            localStorage.removeItem("refreshToken")
             setUser(null)
             try {
                 localStorage.removeItem("merijodi_draft_profile")
@@ -88,6 +92,16 @@ export const AuthProvider = ({ children }) => {
             cancelled = true
         }
     }, [token, saveToken])
+
+    useEffect(() => {
+        const handleAuthLogout = () => {
+            saveToken(null)
+            localStorage.removeItem("refreshToken")
+            setUser(null)
+        }
+        window.addEventListener("auth:logout", handleAuthLogout)
+        return () => window.removeEventListener("auth:logout", handleAuthLogout)
+    }, [saveToken])
 
     const isAuth = Boolean(token)
 

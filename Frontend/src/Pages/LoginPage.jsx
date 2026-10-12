@@ -6,6 +6,8 @@ import { loginWithCredentials, googleAuth } from "../api/authApi"
 import GooglePhoneModal from "../Components/GooglePhoneModal"
 import logo from "../assets/logo2.png"
 
+import loginHeroImage from "../assets/login-image.png"
+
 import { useGoogleLogin } from "@react-oauth/google"
 
 const LoginPage = () => {
@@ -41,7 +43,7 @@ const LoginPage = () => {
                     localStorage.removeItem("merijodi_draft_userId")
                 } catch (_) {}
 
-                signIn(data.token || data.accessToken, data.user)
+                signIn(data.token || data.accessToken, data.user, data.refreshToken)
 
                 // If Google user has no phone number, prompt for mandatory phone capture
                 const userPhone = data.user?.phone
@@ -110,7 +112,7 @@ const LoginPage = () => {
                 localStorage.removeItem("merijodi_draft_userId")
             } catch (_) {}
 
-            signIn(data.token || data.accessToken, data.user)
+            signIn(data.token || data.accessToken, data.user, data.refreshToken)
             navigate("/home")
         } catch (err) {
             setError(err.response?.data?.message || "Invalid credentials. Please check your email and password.")
@@ -121,23 +123,29 @@ const LoginPage = () => {
 
     return (
         <div className="min-h-screen w-full flex bg-[#FAF8F5]">
-            {/* Left Hero Section (Desktop) */}
-            <div className="hidden lg:flex lg:w-5/12 bg-gradient-to-br from-[#FFF0F2] to-[#FFE4E8] flex-col justify-between p-12 border-r border-[#FFE4E8]">
-                <div className="flex items-center gap-3">
-                    <img src={logo} alt="MeriJodi" className="h-10" />
+            {/* Left Brand Banner with Wedding Couple Image (Desktop) */}
+            <div className="hidden lg:flex lg:w-5/12 relative overflow-hidden flex-col justify-between p-12 border-r border-[#FFE4E8]">
+                <img
+                    src={loginHeroImage}
+                    alt="MeriJodi Couple Banner"
+                    className="absolute inset-0 w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/45 to-black/60" />
+                <div className="relative z-10 flex items-center gap-3">
+                    <img src={logo} alt="MeriJodi" className="h-10 bg-white/95 p-1.5 rounded-xl shadow-xs" />
                 </div>
-                <div className="my-auto max-w-md">
-                    <span className="inline-block px-3 py-1 bg-[#ED5463]/10 text-[#ED5463] text-xs font-semibold rounded-full mb-4">
-                        Secure & Verified Matches
+                <div className="relative z-10 my-auto max-w-md text-white">
+                    <span className="inline-block px-3 py-1 bg-white/20 backdrop-blur-xs text-white text-xs font-semibold rounded-full mb-4 border border-white/30">
+                        Secure &amp; Verified Matches
                     </span>
-                    <h2 className="text-4xl font-extrabold text-[#842029] leading-tight mb-4 font-serif">
+                    <h2 className="text-4xl font-extrabold text-white leading-tight mb-4 font-serif drop-shadow-md">
                         Where Trusted Indian Matrimony Begins.
                     </h2>
-                    <p className="text-[#6B7280] text-base leading-relaxed">
+                    <p className="text-white/90 text-base leading-relaxed drop-shadow-xs">
                         Connect with verified profiles and find your ideal life partner with complete trust, dual-token security, and privacy.
                     </p>
                 </div>
-                <div className="text-xs text-[#9CA3AF]">
+                <div className="relative z-10 text-xs text-white/75">
                     © {new Date().getFullYear()} MeriJodi. All rights reserved. • Support: +91 84463 60709
                 </div>
             </div>

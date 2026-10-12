@@ -10,6 +10,7 @@ const router = express.Router()
 router.use(attachUser)
 
 router.post("/", uploadPhoto.single("photo"), handleUploadError, photoController.uploadPhoto.bind(photoController))
+router.post("/upload", uploadPhoto.single("photo"), handleUploadError, photoController.uploadPhoto.bind(photoController))
 router.delete("/:photoId", validateObjectId("photoId"), validate, photoController.deletePhoto.bind(photoController))
 router.put("/primary/:photoId", validateObjectId("photoId"), validate, photoController.setPrimaryPhoto.bind(photoController))
 

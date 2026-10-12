@@ -81,19 +81,23 @@ class InterestController extends BaseController {
             }
 
             // Notify sender
-            const senderProfile = await profileService.getById(
-                interest.senderProfileId
-            )
-            if (senderProfile) {
-                const senderUserId = await profileService.getUserIdFromProfile(senderProfile)
-                if (senderUserId) {
-                    await notificationService.create(
-                        senderUserId,
-                        "interest_accepted",
-                        "Your interest has been accepted",
-                        profile._id
-                    )
+            try {
+                const senderProfile = await profileService.getById(
+                    interest.senderProfileId
+                )
+                if (senderProfile) {
+                    const senderUserId = await profileService.getUserIdFromProfile(senderProfile)
+                    if (senderUserId) {
+                        await notificationService.create(
+                            senderUserId,
+                            "interest_accepted",
+                            "Your interest has been accepted",
+                            profile._id
+                        )
+                    }
                 }
+            } catch (notifyErr) {
+                console.warn("Notification error on acceptInterest:", notifyErr.message)
             }
 
             return this.sendSuccess(res, interest, "Interest accepted")
@@ -126,19 +130,23 @@ class InterestController extends BaseController {
             }
 
             // Notify sender
-            const senderProfile = await profileService.getById(
-                interest.senderProfileId
-            )
-            if (senderProfile) {
-                const senderUserId = await profileService.getUserIdFromProfile(senderProfile)
-                if (senderUserId) {
-                    await notificationService.create(
-                        senderUserId,
-                        "system",
-                        "Your interest has been declined",
-                        profile._id
-                    )
+            try {
+                const senderProfile = await profileService.getById(
+                    interest.senderProfileId
+                )
+                if (senderProfile) {
+                    const senderUserId = await profileService.getUserIdFromProfile(senderProfile)
+                    if (senderUserId) {
+                        await notificationService.create(
+                            senderUserId,
+                            "system",
+                            "Your interest has been declined",
+                            profile._id
+                        )
+                    }
                 }
+            } catch (notifyErr) {
+                console.warn("Notification error on declineInterest:", notifyErr.message)
             }
 
             return this.sendSuccess(res, interest, "Interest declined")

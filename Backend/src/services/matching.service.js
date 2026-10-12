@@ -69,7 +69,12 @@ class MatchingService {
         }
 
         // Gender filter - strictly enforce opposite gender matching: boy sees only girls, girl sees only boys
-        const userGender = String(profile.gender || "").toLowerCase().trim()
+        let userGender = String(profile.gender || "").toLowerCase().trim()
+        if (!userGender && profile.userId) {
+            const user = await User.findById(profile.userId)
+            if (user?.gender) userGender = String(user.gender).toLowerCase().trim()
+        }
+
         let targetGender = null
         if (userGender === "male") {
             targetGender = "female"
@@ -80,7 +85,16 @@ class MatchingService {
         }
 
         if (targetGender) {
-            query.gender = new RegExp(`^${targetGender}$`, "i")
+            query.gender = {
+                $in: [
+                    targetGender,
+                    targetGender.toUpperCase(),
+                    targetGender.charAt(0).toUpperCase() + targetGender.slice(1),
+                    new RegExp(`^${targetGender}$`, "i")
+                ]
+            }
+        } else if (userGender) {
+            query.gender = { $ne: userGender }
         }
 
         // Apply preference filters
@@ -166,9 +180,16 @@ class MatchingService {
                 _id: { $ne: profileId, $nin: blockedIds },
             }
             if (targetGender) {
-                fallbackQuery.gender = new RegExp(`^${targetGender}$`, "i")
-            } else if (query.gender) {
-                fallbackQuery.gender = query.gender
+                fallbackQuery.gender = {
+                    $in: [
+                        targetGender,
+                        targetGender.toUpperCase(),
+                        targetGender.charAt(0).toUpperCase() + targetGender.slice(1),
+                        new RegExp(`^${targetGender}$`, "i")
+                    ]
+                }
+            } else if (userGender) {
+                fallbackQuery.gender = { $ne: userGender }
             }
 
             const [fallbackCandidates, fallbackTotal] = await Promise.all([

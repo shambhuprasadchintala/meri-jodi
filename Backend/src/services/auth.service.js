@@ -1125,6 +1125,7 @@ class AuthService {
             message: "Token refreshed successfully",
             token: newAccessToken,
             accessToken: newAccessToken,
+            refreshToken,
         }
     }
 

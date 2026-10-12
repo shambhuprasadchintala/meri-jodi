@@ -89,13 +89,25 @@ class InterestService {
      * @returns {Promise<object>} Updated interest
      */
     async respond(interestId, profileId, status) {
+        const profileObjId = mongoose.Types.ObjectId.isValid(profileId)
+            ? new mongoose.Types.ObjectId(profileId)
+            : profileId
+
         const interest = await Interest.findOne({
             _id: interestId,
-            receiverProfileId: profileId,
+            $or: [
+                { receiverProfileId: profileId },
+                { receiverProfileId: profileObjId },
+            ],
             status: "pending",
         })
 
         if (!interest) {
+            // Check if already responded with this status (idempotent success)
+            const existing = await Interest.findById(interestId)
+            if (existing && existing.status === status) {
+                return existing
+            }
             throw new Error("Interest not found or already responded")
         }
 

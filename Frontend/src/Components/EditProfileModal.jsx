@@ -114,7 +114,6 @@ const EditProfileModal = ({ isOpen, section: initialSection = "personal", profil
         workLocation: profile.career?.workLocation || "",
 
         // Religion
-        motherTongue: profile.motherTongue || "",
         religion: profile.religion || "",
         caste: profile.caste || "",
         gotham: profile.gotham || "",

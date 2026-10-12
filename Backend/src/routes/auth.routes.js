@@ -3,6 +3,8 @@ import authService from "../services/auth.service.js"
 import { authenticate, attachUser } from "../middlewares/auth.js"
 import { sanitizeBody } from "../middlewares/sanitize.js"
 import ApiResponse from "../utils/ApiResponse.js"
+import { User } from "../models/User.js"
+import { redisClient } from "../config/redis.js"
 import {
     registerSchema,
     loginSchema,
@@ -270,6 +272,13 @@ router.post("/logout", authenticate, async (req, res) => {
 router.get("/me", authenticate, attachUser, async (req, res) => {
     const apiResponse = new ApiResponse(res)
     try {
+        if (req.userId) {
+            const freshUser = await User.findById(req.userId)
+            if (freshUser) {
+                req.user = freshUser.toAuthJSON()
+                await redisClient.setEx(`user:${req.userId}`, 3600, JSON.stringify(req.user))
+            }
+        }
         return apiResponse.success(
             { user: req.user },
             "User retrieved successfully"

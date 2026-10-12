@@ -26,22 +26,36 @@ axiosInstance.interceptors.response.use(
     ) {
       originalRequest._retry = true
       try {
+        const storedRefreshToken = localStorage.getItem("refreshToken")
         const refreshRes = await axios.post(
           `${AUTH_BASE_URL}/refresh`,
-          {},
+          { refreshToken: storedRefreshToken },
           { withCredentials: true, timeout: API_TIMEOUT_MS }
         )
         const newToken =
           refreshRes.data?.data?.token ||
           refreshRes.data?.data?.accessToken
+        const newRefreshToken = refreshRes.data?.data?.refreshToken
+
         if (newToken) {
           localStorage.setItem("token", newToken)
+          if (newRefreshToken) {
+            localStorage.setItem("refreshToken", newRefreshToken)
+          }
           originalRequest.headers.Authorization = `Bearer ${newToken}`
           return axiosInstance(originalRequest)
         }
       } catch (_refreshErr) {
         localStorage.removeItem("token")
-        window.location.href = "/login"
+        localStorage.removeItem("refreshToken")
+        window.dispatchEvent(new CustomEvent("auth:logout"))
+        if (
+          typeof window !== "undefined" &&
+          window.location.pathname !== "/login" &&
+          window.location.pathname !== "/signup"
+        ) {
+          window.location.href = "/login"
+        }
       }
     }
     return Promise.reject(error)

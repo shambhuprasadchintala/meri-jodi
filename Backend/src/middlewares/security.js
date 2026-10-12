@@ -18,15 +18,19 @@ export const configureSecurity = (config) => {
                 if (!origin) return callback(null, true)
 
                 const allowedOrigins = config.security.cors.allowedOrigins || []
-                if (allowedOrigins.includes(origin)) {
+                const normalized = origin.replace(/\/$/, "")
+
+                const isAllowed =
+                    allowedOrigins.includes(origin) ||
+                    allowedOrigins.includes(normalized) ||
+                    (normalized.endsWith(".vercel.app") && normalized.includes("meri-jodi")) ||
+                    (config.env !== "production" && (origin.startsWith("http://localhost") || origin.startsWith("http://127.0.0.1")))
+
+                if (isAllowed) {
                     return callback(null, true)
                 }
 
-                if (config.env !== "production" && origin.startsWith("http://localhost")) {
-                    return callback(null, true)
-                }
-
-                return callback(new Error("Not allowed by CORS"), false)
+                return callback(null, false)
             },
             methods: config.security.cors.allowedMethods,
             allowedHeaders: config.security.cors.allowedHeaders,

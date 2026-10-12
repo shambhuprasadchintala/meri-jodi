@@ -6,10 +6,9 @@ import { useAuth } from "../context/AuthContext"
 import { getMyProfile, createProfile, buildProfilePayload } from "../api/profileApi"
 import { updatePartnerPreferences } from "../api/partnerPreferenceApi"
 import weddingImage from "../assets/login-image.png"
-import Logo from "../assets/logo_1.svg"
+import Logo from "../assets/logo2.png"
 import BasicInfo from "../Components/BasicInfo"
 import PersonalDetails from "../Components/PersonalDetails"
-import Interest from "../Components/Interest"
 import { useToast } from "../context/ToastContext"
 
 const STORAGE_KEY_FORM = "merijodi_draft_profile"
@@ -56,7 +55,6 @@ const initialFormData = {
 const steps = [
   { number: 1, label: "Basic info" },
   { number: 2, label: "Personal Details" },
-  { number: 3, label: "Interest" },
 ]
 
 const parseSafeDob = (dobStr) => {
@@ -486,7 +484,7 @@ const AddDetailsManually = () => {
   }, [step])
 
   const nextStep = () => {
-    setStep((prev) => Math.min(prev + 1, 3))
+    setStep((prev) => Math.min(prev + 1, 2))
   }
 
   const prevStep = () => {
@@ -584,7 +582,7 @@ const AddDetailsManually = () => {
             />
           </div>
           <div>
-            <img src={Logo} alt="MeriJodi logo" className="w-[206px] h-16 object-contain" />
+            <img src={Logo} alt="MeriJodi logo" className="h-10 w-auto object-contain" />
             <h1 className="font-display font-bold text-2xl sm:text-3xl mt-8" style={{ color: MAROON }}>
               Complete Your Profile
             </h1>
@@ -660,15 +658,6 @@ const AddDetailsManually = () => {
                       errors={errors}
                       setErrors={setErrors}
                       nextStep={nextStep}
-                      prevStep={prevStep}
-                    />
-                  )}
-                  {step === 3 && (
-                    <Interest
-                      formData={formData}
-                      setFormData={setFormData}
-                      errors={errors}
-                      setErrors={setErrors}
                       prevStep={prevStep}
                       submitForm={submitForm}
                       loading={loading}
